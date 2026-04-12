@@ -9,7 +9,7 @@ Tracks progress through [Build_Plan.md](Build_Plan.md). Tick tasks as they're co
 ## Phase 1: Foundation & Property Page
 
 - [x] **Task 1.1** — Project scaffolding (Next.js, TS strict, Tailwind, shadcn/ui, structure, lint)
-- [ ] **Task 1.2** — Supabase setup & Prisma configuration _(needs user: create Supabase project, provide keys)_
+- [x] **Task 1.2** — Supabase setup & Prisma configuration _(local Supabase via CLI; hosted instance deferred to deploy time)_
 - [ ] **Task 1.3** — Supabase Storage setup _(needs user: upload sample photos or confirm placeholders)_
 - [ ] **Task 1.4** — Property listing page — photo gallery
 - [ ] **Task 1.5** — Property listing page — description & amenities
@@ -90,4 +90,5 @@ Tracks progress through [Build_Plan.md](Build_Plan.md). Tick tasks as they're co
 _Record non-obvious choices, deviations from the plan, and things a future session would need to know. Keep it tight._
 
 - **Task 1.1**: Scaffolded with `create-next-app` (Next 16, React 19, Tailwind v4, Turbopack, App Router, no `src/` dir, `@/*` import alias). shadcn/ui initialised with the `neutral` base via `--defaults`. Home page lives at `app/(guest)/page.tsx`; root layout in `app/layout.tsx` wraps all routes with `Header`/`Footer` from `components/layout/`. Prettier configured with `prettier-plugin-tailwindcss`. `.env.example` committed; `.env.local` gitignored.
+- **Task 1.2**: Local dev uses Supabase CLI (`supabase start`) instead of a hosted instance — hosted Supabase will be wired up at deploy time. Local stack runs on bumped ports `544xx` (api 54421, db 54422, studio 54423, mailpit 54424, analytics 54427) to avoid conflict with another local Supabase project (`savi-local`) on this machine — set in `supabase/config.toml`. Prisma 7.7.0 uses the new `prisma-client` generator (output → `lib/generated/prisma`, gitignored) plus the `@prisma/adapter-pg` driver adapter — both required in v7. Connection URL is no longer in `schema.prisma`; it lives in `prisma.config.ts`, which loads `.env.local` via `dotenv` for migrations (Next.js handles runtime env loading). Singleton client at [lib/db/prisma.ts](lib/db/prisma.ts). Phase 1 schema covers `Property`, `PropertyPhoto`, `Amenity`, `PropertyAmenity`, `SiteConfiguration` only — booking/payment/messaging/review entities will be added in their respective phases. Seed populates one placeholder property (`The Staithes Cottage`) plus 15 reference amenities with 10 linked. Verified end-to-end at [`/api/property`](app/api/property/route.ts).
 

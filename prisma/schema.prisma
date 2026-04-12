@@ -1,0 +1,157 @@
+// Prisma schema for the staithes single-property rental platform.
+//
+// Phase 1 entities only (Property, PropertyPhoto, Amenity, PropertyAmenity,
+// SiteConfiguration). Booking / payment / messaging / review entities are
+// added in later phases per Build_Plan.md.
+//
+// Field definitions follow foundation_documents/Data_Model_and_Architecture.docx.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Enums ----------
+
+enum PropertyType {
+  house
+  flat
+  cottage
+  cabin
+  other
+}
+
+enum PropertyStatus {
+  active
+  paused
+  hidden
+}
+
+enum CancellationPolicy {
+  flexible
+  moderate
+  strict
+}
+
+enum PhotoCategory {
+  exterior
+  living
+  bedroom
+  kitchen
+  bathroom
+  garden
+  other
+}
+
+enum AmenityCategory {
+  essentials
+  features
+  safety
+  accessibility
+  outdoor
+}
+
+// ---------- Models ----------
+
+model Property {
+  id                 String             @id @default(uuid()) @db.Uuid
+  name               String
+  slug               String             @unique
+  description        String
+  shortDescription   String?            @map("short_description")
+  propertyType       PropertyType       @map("property_type")
+  addressFull        String             @map("address_full")
+  addressApprox      String             @map("address_approx")
+  latitude           Decimal            @db.Decimal(10, 7)
+  longitude          Decimal            @db.Decimal(10, 7)
+  maxGuests          Int                @map("max_guests")
+  bedrooms           Int
+  beds               Int
+  bathrooms          Decimal            @db.Decimal(3, 1)
+  checkInTime        String             @map("check_in_time")
+  checkOutTime       String             @map("check_out_time")
+  minStayDefault     Int                @default(1) @map("min_stay_default")
+  maxStay            Int?               @map("max_stay")
+  baseNightlyRate    Decimal            @map("base_nightly_rate") @db.Decimal(10, 2)
+  cleaningFee        Decimal            @default(0) @map("cleaning_fee") @db.Decimal(10, 2)
+  extraGuestFee      Decimal            @default(0) @map("extra_guest_fee") @db.Decimal(10, 2)
+  baseGuestCount     Int                @map("base_guest_count")
+  currency           String             @default("GBP") @db.Char(3)
+  houseRules         String?            @map("house_rules")
+  cancellationPolicy CancellationPolicy @default(moderate) @map("cancellation_policy")
+  status             PropertyStatus     @default(active)
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  photos    PropertyPhoto[]
+  amenities PropertyAmenity[]
+
+  @@map("properties")
+}
+
+model PropertyPhoto {
+  id           String        @id @default(uuid()) @db.Uuid
+  propertyId   String        @map("property_id") @db.Uuid
+  url          String
+  thumbnailUrl String?       @map("thumbnail_url")
+  caption      String?
+  category     PhotoCategory @default(other)
+  altText      String        @map("alt_text")
+  sortOrder    Int           @default(0) @map("sort_order")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, sortOrder])
+  @@map("property_photos")
+}
+
+model Amenity {
+  id        String          @id @default(uuid()) @db.Uuid
+  name      String          @unique
+  icon      String
+  category  AmenityCategory
+  sortOrder Int             @default(0) @map("sort_order")
+
+  properties PropertyAmenity[]
+
+  @@map("amenities")
+}
+
+model PropertyAmenity {
+  propertyId String  @map("property_id") @db.Uuid
+  amenityId  String  @map("amenity_id") @db.Uuid
+  notes      String?
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  amenity  Amenity  @relation(fields: [amenityId], references: [id], onDelete: Cascade)
+
+  @@id([propertyId, amenityId])
+  @@map("property_amenities")
+}
+
+// Singleton: exactly one row, enforced via a single fixed id at insert time.
+model SiteConfiguration {
+  id              String   @id @default(uuid()) @db.Uuid
+  siteName        String   @map("site_name")
+  tagline         String?
+  logoUrl         String?  @map("logo_url")
+  primaryColour   String?  @map("primary_colour")
+  accentColour    String?  @map("accent_colour")
+  contactEmail    String   @map("contact_email")
+  contactPhone    String?  @map("contact_phone")
+  senderEmail     String?  @map("sender_email")
+  senderName      String?  @map("sender_name")
+  seoTitle        String?  @map("seo_title")
+  seoDescription  String?  @map("seo_description")
+  ogImageUrl      String?  @map("og_image_url")
+  analyticsId     String?  @map("analytics_id")
+  timezone        String   @default("Europe/London")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("site_configuration")
+}
