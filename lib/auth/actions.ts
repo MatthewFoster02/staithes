@@ -7,6 +7,7 @@ import { createSupabaseServerClient } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
 import { siteUrl } from "@/lib/seo/site";
 import { safeNext } from "@/lib/auth/safe-redirect";
+import { isHostEmail } from "@/lib/auth/host";
 
 // ---------------------------------------------------------------------------
 // Form schemas
@@ -113,7 +114,10 @@ export async function signInAction(_prev: AuthActionResult | null, formData: For
     return { ok: false, error: error.message };
   }
 
-  const next = safeNext(formData.get("next") as string | null, "/dashboard");
+  // Host email defaults to /admin/dashboard, everyone else to /dashboard.
+  // An explicit next= overrides both.
+  const fallback = isHostEmail(parsed.data.email) ? "/admin/dashboard" : "/dashboard";
+  const next = safeNext(formData.get("next") as string | null, fallback);
   revalidatePath("/", "layout");
   redirect(next);
 }

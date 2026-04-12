@@ -1,7 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isHostEmail } from "@/lib/auth/host";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/messages", "/admin"];
+const HOST_ONLY_PREFIXES = ["/admin"];
 const AUTH_ONLY_PAGES = ["/login", "/signup"];
 
 // Runs on every request matched by middleware.ts. Two jobs:
@@ -50,6 +52,7 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+  const isHostOnly = HOST_ONLY_PREFIXES.some((p) => pathname.startsWith(p));
   const isAuthOnly = AUTH_ONLY_PAGES.some((p) => pathname.startsWith(p));
 
   if (!user && isProtected) {
@@ -59,9 +62,18 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthOnly) {
+  // Signed-in non-hosts are bounced from /admin to their guest
+  // dashboard. Hosts hitting /login/signup also get sent to admin
+  // rather than the guest dashboard.
+  if (user && isHostOnly && !isHostEmail(user.email)) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
+
+  if (user && isAuthOnly) {
+    const url = request.nextUrl.clone();
+    url.pathname = isHostEmail(user.email) ? "/admin/dashboard" : "/dashboard";
     return NextResponse.redirect(url);
   }
 

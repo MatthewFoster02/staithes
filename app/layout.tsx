@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Header } from "@/components/layout/header";
-import { Footer } from "@/components/layout/footer";
 import { siteUrl } from "@/lib/seo/site";
 import "./globals.css";
 
@@ -26,6 +24,11 @@ export const metadata: Metadata = {
   description: "A short-stay holiday rental",
 };
 
+// Root layout intentionally minimal: just html/body/fonts. Each area
+// of the app provides its own header/footer chrome via a nested
+// layout — guest pages via app/(guest)/layout.tsx, admin pages via
+// app/admin/layout.tsx — so they can look completely different
+// without leaking style across the boundary.
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -36,11 +39,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        <Header />
-        <main className="flex-1">{children}</main>
-        <Footer />
-      </body>
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }
