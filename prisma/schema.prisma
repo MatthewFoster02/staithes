@@ -1,8 +1,8 @@
 // Prisma schema for the staithes single-property rental platform.
 //
-// Phase 1 entities only (Property, PropertyPhoto, Amenity, PropertyAmenity,
-// SiteConfiguration). Booking / payment / messaging / review entities are
-// added in later phases per Build_Plan.md.
+// Phase 1 + Phase 2 entities. Messaging / review / extended pricing /
+// automated email log entities are still deferred to their respective
+// phases per Build_Plan.md.
 //
 // Field definitions follow foundation_documents/Data_Model_and_Architecture.docx.
 
@@ -55,6 +55,42 @@ enum AmenityCategory {
   outdoor
 }
 
+enum BookingStatus {
+  pending
+  confirmed
+  cancelled
+  completed
+  no_show
+}
+
+enum BookingType {
+  instant
+  request
+}
+
+enum PaymentType {
+  charge
+  refund
+  pre_auth
+  capture
+  damage_charge
+}
+
+enum PaymentStatus {
+  pending
+  completed
+  failed
+  refunded
+}
+
+enum PricingRuleType {
+  seasonal
+  day_of_week
+  last_minute
+  early_bird
+  length_discount
+}
+
 // ---------- Models ----------
 
 model Property {
@@ -87,8 +123,11 @@ model Property {
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
-  photos    PropertyPhoto[]
-  amenities PropertyAmenity[]
+  photos       PropertyPhoto[]
+  amenities    PropertyAmenity[]
+  bookings     Booking[]
+  blockedDates BlockedDate[]
+  pricingRules PricingRule[]
 
   @@map("properties")
 }
@@ -132,6 +171,160 @@ model PropertyAmenity {
 
   @@id([propertyId, amenityId])
   @@map("property_amenities")
+}
+
+// Application-level guest profile. The `id` is intended to mirror the
+// Supabase `auth.users.id` so a single UUID identifies a user across
+// both schemas — credentials live in Supabase Auth, application data
+// (bookings, messages, reviews) hangs off this row.
+model Guest {
+  id                String    @id @db.Uuid
+  email             String    @unique
+  firstName         String    @map("first_name")
+  lastName          String    @map("last_name")
+  phone             String?
+  country           String?
+  preferredLanguage String?   @map("preferred_language")
+  isVerified        Boolean   @default(false) @map("is_verified")
+  notesInternal     String?   @map("notes_internal")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  lastLoginAt       DateTime? @map("last_login_at")
+
+  bookings Booking[]
+
+  @@map("guests")
+}
+
+// The central transactional entity. Snapshots price + cancellation
+// policy at booking time so later changes never retroactively alter
+// existing reservations.
+model Booking {
+  id                       String        @id @default(uuid()) @db.Uuid
+  propertyId               String        @map("property_id") @db.Uuid
+  guestId                  String        @map("guest_id") @db.Uuid
+  checkIn                  DateTime      @map("check_in") @db.Date
+  checkOut                 DateTime      @map("check_out") @db.Date
+  numGuestsAdults          Int           @map("num_guests_adults")
+  numGuestsChildren        Int           @default(0) @map("num_guests_children")
+  status                   BookingStatus @default(pending)
+  bookingType              BookingType   @default(instant) @map("booking_type")
+  totalPrice               Decimal       @map("total_price") @db.Decimal(10, 2)
+  currency                 String        @db.Char(3)
+  cancellationPolicySnapshot Json        @map("cancellation_policy_snapshot")
+  guestMessage             String?       @map("guest_message")
+  specialRequests          String?       @map("special_requests")
+  checkInInstructionsSent  Boolean       @default(false) @map("check_in_instructions_sent")
+  cancellationReason       String?       @map("cancellation_reason")
+  createdAt                DateTime      @default(now()) @map("created_at")
+  confirmedAt              DateTime?     @map("confirmed_at")
+  cancelledAt              DateTime?     @map("cancelled_at")
+  completedAt              DateTime?     @map("completed_at")
+
+  property      Property              @relation(fields: [propertyId], references: [id])
+  guest         Guest                 @relation(fields: [guestId], references: [id])
+  priceSnapshot BookingPriceSnapshot?
+  payments      Payment[]
+
+  @@index([propertyId, checkIn, checkOut, status])
+  @@index([guestId])
+  @@map("bookings")
+}
+
+// The itemised price breakdown frozen at booking time. One-to-one
+// with Booking. Stored separately so receipts and audit trails are
+// clean and the Booking row stays focused on lifecycle state.
+model BookingPriceSnapshot {
+  id                    String   @id @default(uuid()) @db.Uuid
+  bookingId             String   @unique @map("booking_id") @db.Uuid
+  nightlyRates          Json     @map("nightly_rates") // [{ date: "YYYY-MM-DD", rate: 145.00 }]
+  numNights             Int      @map("num_nights")
+  subtotalAccommodation Decimal  @map("subtotal_accommodation") @db.Decimal(10, 2)
+  cleaningFee           Decimal  @default(0) @map("cleaning_fee") @db.Decimal(10, 2)
+  extraGuestFeeTotal    Decimal  @default(0) @map("extra_guest_fee_total") @db.Decimal(10, 2)
+  discountAmount        Decimal  @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  discountDescription   String?  @map("discount_description")
+  serviceFee            Decimal  @default(0) @map("service_fee") @db.Decimal(10, 2)
+  taxAmount             Decimal  @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  taxDescription        String?  @map("tax_description")
+  total                 Decimal  @db.Decimal(10, 2)
+  currency              String   @db.Char(3)
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("booking_price_snapshots")
+}
+
+// Individual financial transactions against a booking. A booking may
+// have many payments over its lifetime (initial charge, refunds,
+// damage charges, etc.).
+model Payment {
+  id                   String        @id @default(uuid()) @db.Uuid
+  bookingId            String        @map("booking_id") @db.Uuid
+  type                 PaymentType
+  amount               Decimal       @db.Decimal(10, 2)
+  currency             String        @db.Char(3)
+  status               PaymentStatus @default(pending)
+  gateway              String
+  gatewayTransactionId String?       @map("gateway_transaction_id")
+  gatewayResponse      Json?         @map("gateway_response")
+  cardLastFour         String?       @map("card_last_four")
+  cardBrand            String?       @map("card_brand")
+  refundReason         String?       @map("refund_reason")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  completedAt          DateTime?     @map("completed_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@index([bookingId])
+  @@map("payments")
+}
+
+// Date ranges manually blocked by the host. Treated as unavailable
+// in the calendar alongside confirmed/pending bookings.
+model BlockedDate {
+  id         String   @id @default(uuid()) @db.Uuid
+  propertyId String   @map("property_id") @db.Uuid
+  dateStart  DateTime @map("date_start") @db.Date
+  dateEnd    DateTime @map("date_end") @db.Date
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, dateStart, dateEnd])
+  @@map("blocked_dates")
+}
+
+// Overrides to the base nightly rate for specific date ranges, days
+// of the week, or stay lengths. Rules are evaluated in priority order;
+// the most specific matching rule wins. Phase 2 only writes the
+// schema; the full pricing engine that consumes these rules lands in
+// Phase 7.
+model PricingRule {
+  id                   String          @id @default(uuid()) @db.Uuid
+  propertyId           String          @map("property_id") @db.Uuid
+  name                 String
+  type                 PricingRuleType
+  dateStart            DateTime?       @map("date_start") @db.Date
+  dateEnd              DateTime?       @map("date_end") @db.Date
+  daysOfWeek           Int[]           @default([]) @map("days_of_week")
+  nightlyRate          Decimal?        @map("nightly_rate") @db.Decimal(10, 2)
+  rateMultiplier       Decimal?        @map("rate_multiplier") @db.Decimal(5, 3)
+  minStay              Int?            @map("min_stay")
+  minNightsForDiscount Int?            @map("min_nights_for_discount")
+  discountPercent      Decimal?        @map("discount_percent") @db.Decimal(5, 2)
+  daysBeforeCheckin    Int?            @map("days_before_checkin")
+  daysAdvanceBooking   Int?            @map("days_advance_booking")
+  priority             Int             @default(0)
+  isActive             Boolean         @default(true) @map("is_active")
+  createdAt            DateTime        @default(now()) @map("created_at")
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, isActive, priority])
+  @@map("pricing_rules")
 }
 
 // Singleton: exactly one row, enforced via a single fixed id at insert time.
