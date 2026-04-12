@@ -8,7 +8,7 @@ Tracks progress through [Build_Plan.md](Build_Plan.md). Tick tasks as they're co
 
 ## Phase 1: Foundation & Property Page
 
-- [ ] **Task 1.1** — Project scaffolding (Next.js, TS strict, Tailwind, shadcn/ui, structure, lint)
+- [x] **Task 1.1** — Project scaffolding (Next.js, TS strict, Tailwind, shadcn/ui, structure, lint)
 - [ ] **Task 1.2** — Supabase setup & Prisma configuration _(needs user: create Supabase project, provide keys)_
 - [ ] **Task 1.3** — Supabase Storage setup _(needs user: upload sample photos or confirm placeholders)_
 - [ ] **Task 1.4** — Property listing page — photo gallery
@@ -88,3 +88,6 @@ Tracks progress through [Build_Plan.md](Build_Plan.md). Tick tasks as they're co
 ## Notes & decisions
 
 _Record non-obvious choices, deviations from the plan, and things a future session would need to know. Keep it tight._
+
+- **Task 1.1**: Scaffolded with `create-next-app` (Next 16, React 19, Tailwind v4, Turbopack, App Router, no `src/` dir, `@/*` import alias). shadcn/ui initialised with the `neutral` base via `--defaults`. Home page lives at `app/(guest)/page.tsx`; root layout in `app/layout.tsx` wraps all routes with `Header`/`Footer` from `components/layout/`. Prettier configured with `prettier-plugin-tailwindcss`. `.env.example` committed; `.env.local` gitignored.
+
