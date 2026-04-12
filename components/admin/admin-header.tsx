@@ -7,6 +7,7 @@ import { signOutAction } from "@/lib/auth/actions";
 const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "Dashboard" },
   { href: "/admin/bookings", label: "Bookings" },
+  { href: "/admin/calendar", label: "Calendar" },
 ];
 
 export function AdminHeader({ firstName }: { firstName: string | null }) {
