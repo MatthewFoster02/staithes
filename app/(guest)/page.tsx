@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/db/prisma";
 import { PhotoGallery, type GalleryPhoto } from "@/components/property/photo-gallery";
 import { PropertyDetails } from "@/components/property/property-details";
@@ -8,6 +9,60 @@ import {
 } from "@/components/property/property-amenities";
 import { PropertyMap } from "@/components/property/property-map";
 import { Button } from "@/components/ui/button";
+import { propertyPhotoUrl } from "@/lib/storage/photos";
+import { siteUrl } from "@/lib/seo/site";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const [property, siteConfig] = await Promise.all([
+    prisma.property.findFirst({
+      include: { photos: { orderBy: { sortOrder: "asc" }, take: 1 } },
+    }),
+    prisma.siteConfiguration.findFirst(),
+  ]);
+
+  const siteName = siteConfig?.siteName ?? "Staithes";
+  const title = siteConfig?.seoTitle ?? property?.name ?? siteName;
+  const description =
+    siteConfig?.seoDescription ??
+    property?.shortDescription ??
+    "A short-stay holiday rental.";
+
+  const heroPath = property?.photos[0]?.url ?? null;
+  const ogImageUrl = siteConfig?.ogImageUrl ?? (heroPath ? propertyPhotoUrl(heroPath) : null);
+  const images = ogImageUrl
+    ? [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: property?.photos[0]?.altText ?? siteName,
+        },
+      ]
+    : undefined;
+
+  return {
+    title: { absolute: title },
+    description,
+    alternates: {
+      canonical: siteUrl(),
+    },
+    openGraph: {
+      type: "website",
+      url: siteUrl(),
+      siteName,
+      title,
+      description,
+      images,
+      locale: "en_GB",
+    },
+    twitter: {
+      card: images ? "summary_large_image" : "summary",
+      title,
+      description,
+      images: images?.map((i) => i.url),
+    },
+  };
+}
 
 export default async function HomePage() {
   const property = await prisma.property.findFirst({

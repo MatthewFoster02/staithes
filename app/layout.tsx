@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
+import { siteUrl } from "@/lib/seo/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,8 +15,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Per-page generateMetadata calls override these. metadataBase is set
+// here so relative OG/Twitter image URLs resolve correctly.
 export const metadata: Metadata = {
-  title: "Staithes",
+  metadataBase: new URL(siteUrl()),
+  title: {
+    default: "Staithes",
+    template: "%s · Staithes",
+  },
   description: "A short-stay holiday rental",
 };
 
