@@ -91,6 +91,18 @@ enum PricingRuleType {
   length_discount
 }
 
+enum MessageThreadStatus {
+  open
+  closed
+  archived
+}
+
+enum MessageSenderType {
+  guest
+  host
+  system
+}
+
 // ---------- Models ----------
 
 model Property {
@@ -123,11 +135,12 @@ model Property {
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
-  photos       PropertyPhoto[]
-  amenities    PropertyAmenity[]
-  bookings     Booking[]
-  blockedDates BlockedDate[]
-  pricingRules PricingRule[]
+  photos         PropertyPhoto[]
+  amenities      PropertyAmenity[]
+  bookings       Booking[]
+  blockedDates   BlockedDate[]
+  pricingRules   PricingRule[]
+  messageThreads MessageThread[]
 
   @@map("properties")
 }
@@ -191,7 +204,9 @@ model Guest {
   updatedAt         DateTime  @updatedAt @map("updated_at")
   lastLoginAt       DateTime? @map("last_login_at")
 
-  bookings Booking[]
+  bookings       Booking[]
+  messageThreads MessageThread[]
+  messagesSent   Message[]
 
   @@map("guests")
 }
@@ -225,6 +240,7 @@ model Booking {
   guest         Guest                 @relation(fields: [guestId], references: [id])
   priceSnapshot BookingPriceSnapshot?
   payments      Payment[]
+  messageThread MessageThread?
 
   @@index([propertyId, checkIn, checkOut, status])
   @@index([guestId])
@@ -325,6 +341,58 @@ model PricingRule {
 
   @@index([propertyId, isActive, priority])
   @@map("pricing_rules")
+}
+
+// Conversation container between a guest and the host. Linked to a
+// booking when one exists, but pre-booking enquiries create threads
+// without a booking_id and get linked later if the enquiry converts.
+// `bookingId` is unique-when-not-null so each booking gets at most
+// one thread; multiple pre-booking enquiry threads from the same
+// guest are allowed (each NULL is distinct in Postgres UNIQUE).
+model MessageThread {
+  id         String              @id @default(uuid()) @db.Uuid
+  propertyId String              @map("property_id") @db.Uuid
+  guestId    String              @map("guest_id") @db.Uuid
+  bookingId  String?             @unique @map("booking_id") @db.Uuid
+  subject    String?
+  status     MessageThreadStatus @default(open)
+  createdAt  DateTime            @default(now()) @map("created_at")
+  updatedAt  DateTime            @updatedAt @map("updated_at")
+
+  property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  guest    Guest     @relation(fields: [guestId], references: [id])
+  booking  Booking?  @relation(fields: [bookingId], references: [id])
+  messages Message[]
+
+  @@index([propertyId, status, updatedAt])
+  @@index([guestId, updatedAt])
+  @@map("message_threads")
+}
+
+// A single message inside a thread. `senderType` distinguishes
+// guest, host, and system messages. `senderId` references the Guest
+// row when senderType=guest, otherwise null (host messages don't
+// have a guest id, and there's only ever one host per single-property
+// site so we don't model the host as a row).
+//
+// `isRead` is interpreted as "read by the recipient" — i.e. for a
+// guest message it means the host has seen it; for a host message
+// it means the guest has seen it. The service layer flips it when
+// the recipient opens the thread.
+model Message {
+  id         String            @id @default(uuid()) @db.Uuid
+  threadId   String            @map("thread_id") @db.Uuid
+  senderType MessageSenderType @map("sender_type")
+  senderId   String?           @map("sender_id") @db.Uuid
+  content    String
+  isRead     Boolean           @default(false) @map("is_read")
+  createdAt  DateTime          @default(now()) @map("created_at")
+
+  thread       MessageThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderGuest  Guest?        @relation(fields: [senderId], references: [id])
+
+  @@index([threadId, createdAt])
+  @@map("messages")
 }
 
 // Idempotency log for inbound Stripe webhooks. The Stripe event id
