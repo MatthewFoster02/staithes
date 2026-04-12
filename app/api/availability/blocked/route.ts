@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { listBlockedDays } from "@/lib/availability/check";
 import { addDays, parseISODate } from "@/lib/availability/dates";
 import { todayUTC } from "@/lib/availability/check";
+import { createSupabaseServerClient } from "@/lib/auth/server";
 
 export const dynamic = "force-dynamic";
 
@@ -37,17 +38,26 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "No property configured" }, { status: 404 });
   }
 
+  // If the request is authed, ask the service to separate the
+  // current guest's own bookings into `mine` so the calendar can
+  // mark them as the user's rather than as generic unavailable.
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   // Default range: today through today + 12 months. The calendar
   // typically only renders ~2 months at a time, but pre-fetching a
   // year keeps the response cacheable and avoids per-month chatter.
   const from = parsed.data.from ? parseISODate(parsed.data.from) : todayUTC();
   const to = parsed.data.to ? parseISODate(parsed.data.to) : addDays(todayUTC(), 365);
 
-  const blocked = await listBlockedDays({
+  const result = await listBlockedDays({
     propertyId: property.id,
     from,
     to,
+    guestId: user?.id,
   });
 
-  return NextResponse.json({ blocked });
+  return NextResponse.json(result);
 }

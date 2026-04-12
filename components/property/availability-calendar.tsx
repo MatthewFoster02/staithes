@@ -16,6 +16,7 @@ interface AvailabilityCalendarProps {
   minStay: number;
   maxStay: number | null;
   maxGuests: number;
+  isSignedIn: boolean;
 }
 
 interface PriceBreakdown {
@@ -48,27 +49,35 @@ export function AvailabilityCalendar({
   minStay,
   maxStay,
   maxGuests,
+  isSignedIn,
 }: AvailabilityCalendarProps) {
   const [blockedDays, setBlockedDays] = React.useState<Set<string>>(new Set());
+  const [myDays, setMyDays] = React.useState<Set<string>>(new Set());
   const [loadingBlocked, setLoadingBlocked] = React.useState(true);
   const [range, setRange] = React.useState<DateRange | undefined>(undefined);
   const [adults, setAdults] = React.useState(2);
   const [children, setChildren] = React.useState(0);
   const [breakdown, setBreakdown] = React.useState<PriceBreakdown | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [reserving, setReserving] = React.useState(false);
+  const [reserveError, setReserveError] = React.useState<string | null>(null);
 
-  // Fetch the year-long blocked-day list once on mount.
+  // Fetch the year-long blocked-day list once on mount. The endpoint
+  // also returns the current guest's own bookings (when signed in)
+  // separately so we can highlight them.
   React.useEffect(() => {
     let cancelled = false;
     fetch("/api/availability/blocked")
       .then((r) => r.json())
-      .then((data: { blocked: string[] }) => {
+      .then((data: { blocked: string[]; mine: string[] }) => {
         if (cancelled) return;
         setBlockedDays(new Set(data.blocked));
+        setMyDays(new Set(data.mine ?? []));
       })
       .catch(() => {
         if (cancelled) return;
         setBlockedDays(new Set());
+        setMyDays(new Set());
       })
       .finally(() => {
         if (!cancelled) setLoadingBlocked(false);
@@ -132,9 +141,14 @@ export function AvailabilityCalendar({
 
   const today = todayUTC();
   const blockedMatcher: Matcher = (day: Date) => blockedDays.has(formatISODate(day));
-  // Disable: past days, blocked days. react-day-picker handles the
-  // "can't end on a blocked day" case via disabled directly.
-  const disabled: Matcher[] = [{ before: today }, blockedMatcher];
+  const mineMatcher: Matcher = (day: Date) => myDays.has(formatISODate(day));
+  // Disable: past days, blocked days, AND your own already-booked
+  // days (you can't double-book yourself).
+  const disabled: Matcher[] = [{ before: today }, blockedMatcher, mineMatcher];
+  // Two custom modifiers so the calendar can show three distinct
+  // states: available, taken-by-someone-else (strikethrough grey),
+  // and yours (highlighted emerald). All but the first are disabled.
+  const modifiers = { unavailable: blockedMatcher, mine: mineMatcher };
 
   const totalGuests = adults + children;
   const guestsLabel = totalGuests === 1 ? "1 guest" : `${totalGuests} guests`;
@@ -158,29 +172,46 @@ export function AvailabilityCalendar({
           Loading availability…
         </div>
       ) : (
-        <Calendar
-          mode="range"
-          selected={range}
-          onSelect={setRange}
-          numberOfMonths={1}
-          disabled={disabled}
-          excludeDisabled
-          startMonth={today}
-          className="mx-auto"
-          classNames={{
-            // Today: subtle ring instead of a fill, so it doesn't
-            // visually merge with range_middle/range_end (which both
-            // use bg-muted in the shadcn defaults).
-            today:
-              "relative bg-transparent text-foreground ring-1 ring-inset ring-neutral-300 rounded-(--cell-radius) data-[selected=true]:ring-0",
-            // Tailwind v4 dropped the legacy cursor:pointer button
-            // default. Target the child Button (not the cell) so the
-            // pointer follows pointer-events: enabled buttons get the
-            // pointer, disabled buttons block events and the cell's
-            // default cursor shows through.
-            day: "[&>button]:cursor-pointer",
-          }}
-        />
+        <>
+          <Calendar
+            mode="range"
+            selected={range}
+            onSelect={setRange}
+            numberOfMonths={1}
+            disabled={disabled}
+            excludeDisabled
+            startMonth={today}
+            modifiers={modifiers}
+            modifiersClassNames={{
+              unavailable:
+                "[&>button]:line-through [&>button]:text-neutral-400",
+              mine: "[&>button]:bg-emerald-100 [&>button]:text-emerald-900 [&>button]:font-semibold [&>button]:rounded-(--cell-radius)",
+            }}
+            className="mx-auto"
+            classNames={{
+              // Today: subtle ring instead of a fill, so it doesn't
+              // visually merge with range_middle/range_end (which both
+              // use bg-muted in the shadcn defaults).
+              today:
+                "relative bg-transparent text-foreground ring-1 ring-inset ring-neutral-300 rounded-(--cell-radius) data-[selected=true]:ring-0",
+              // Tailwind v4 dropped the legacy cursor:pointer button
+              // default. Target the child Button (not the cell) so the
+              // pointer follows pointer-events: enabled buttons get the
+              // pointer, disabled buttons block events and the cell's
+              // default cursor shows through.
+              day: "[&>button]:cursor-pointer",
+            }}
+          />
+          <div className="mt-2 flex flex-col items-center gap-1 text-xs text-neutral-500">
+            <p>Strikethrough dates are already booked or blocked.</p>
+            {myDays.size > 0 && (
+              <p>
+                <span className="mr-1 inline-block size-2 rounded-full bg-emerald-300 align-middle" />
+                Highlighted dates are from your existing bookings.
+              </p>
+            )}
+          </div>
+        </>
       )}
 
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
@@ -243,15 +274,55 @@ export function AvailabilityCalendar({
         </dl>
       )}
 
-      <Button
-        className="mt-4 w-full"
-        disabled={!breakdown || !!error}
-      >
-        {breakdown ? "Reserve" : "Select dates"}
-      </Button>
+      {isSignedIn ? (
+        <Button
+          className="mt-4 w-full"
+          disabled={!breakdown || !!error || reserving}
+          onClick={async () => {
+            if (!range?.from || !range?.to) return;
+            setReserving(true);
+            setReserveError(null);
+            try {
+              const res = await fetch("/api/bookings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  checkIn: formatISODate(range.from),
+                  checkOut: formatISODate(range.to),
+                  adults,
+                  children,
+                }),
+              });
+              const data = await res.json();
+              if (!res.ok || !data.checkoutUrl) {
+                setReserveError(data.error ?? "Could not start checkout.");
+                setReserving(false);
+                return;
+              }
+              window.location.href = data.checkoutUrl;
+            } catch {
+              setReserveError("Network error. Please try again.");
+              setReserving(false);
+            }
+          }}
+        >
+          {reserving ? "Redirecting to payment…" : breakdown ? "Reserve" : "Select dates"}
+        </Button>
+      ) : (
+        <a
+          href="/login?next=/"
+          className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          Sign in to book
+        </a>
+      )}
+
+      {reserveError && (
+        <p className="mt-3 text-sm text-red-600">{reserveError}</p>
+      )}
 
       <p className="mt-3 text-center text-xs text-neutral-500">
-        Booking flow lands in Phase 2 — Stripe checkout coming next.
+        You won&rsquo;t be charged until you confirm on the next page.
       </p>
     </div>
   );

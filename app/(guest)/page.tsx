@@ -9,6 +9,7 @@ import {
 } from "@/components/property/property-amenities";
 import { PropertyMap } from "@/components/property/property-map";
 import { AvailabilityCalendar } from "@/components/property/availability-calendar";
+import { getCurrentUser } from "@/lib/auth/server";
 import { propertyPhotoUrl } from "@/lib/storage/photos";
 import { siteUrl } from "@/lib/seo/site";
 
@@ -65,15 +66,18 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const property = await prisma.property.findFirst({
-    include: {
-      photos: { orderBy: { sortOrder: "asc" } },
-      amenities: {
-        include: { amenity: true },
-        orderBy: { amenity: { sortOrder: "asc" } },
+  const [property, user] = await Promise.all([
+    prisma.property.findFirst({
+      include: {
+        photos: { orderBy: { sortOrder: "asc" } },
+        amenities: {
+          include: { amenity: true },
+          orderBy: { amenity: { sortOrder: "asc" } },
+        },
       },
-    },
-  });
+    }),
+    getCurrentUser(),
+  ]);
 
   if (!property) {
     return (
@@ -160,6 +164,7 @@ export default async function HomePage() {
             minStay={property.minStayDefault}
             maxStay={property.maxStay}
             maxGuests={property.maxGuests}
+            isSignedIn={!!user}
           />
         </aside>
       </div>

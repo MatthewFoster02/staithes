@@ -139,16 +139,24 @@ export interface ListBlockedDaysArgs {
   propertyId: string;
   from: Date;
   to: Date; // exclusive
+  // If provided, the current guest's own pending/confirmed bookings
+  // are returned in `mine` and excluded from `blocked`, so the
+  // calendar can distinguish "I booked this" from "someone else did".
+  guestId?: string;
 }
 
-// Returns a sorted, unique list of YYYY-MM-DD day strings that the
-// calendar should render as unavailable, combining manually blocked
-// dates and active bookings. The calendar consumes individual days
-// rather than ranges so it can apply per-day classes without doing
-// overlap math client-side.
-export async function listBlockedDays(args: ListBlockedDaysArgs): Promise<string[]> {
-  const { propertyId, from, to } = args;
-  if (from >= to) return [];
+export interface BlockedDaysResult {
+  blocked: string[];
+  mine: string[];
+}
+
+// Returns sorted, unique YYYY-MM-DD day strings the calendar should
+// render as unavailable, combining manually blocked dates and active
+// bookings. When `guestId` is supplied, the user's own bookings are
+// split into the `mine` array and the two sets are guaranteed disjoint.
+export async function listBlockedDays(args: ListBlockedDaysArgs): Promise<BlockedDaysResult> {
+  const { propertyId, from, to, guestId } = args;
+  if (from >= to) return { blocked: [], mine: [] };
 
   const [blocked, bookings] = await Promise.all([
     prisma.blockedDate.findMany({
@@ -166,11 +174,12 @@ export async function listBlockedDays(args: ListBlockedDaysArgs): Promise<string
         checkIn: { lt: to },
         checkOut: { gt: from },
       },
-      select: { checkIn: true, checkOut: true },
+      select: { checkIn: true, checkOut: true, guestId: true },
     }),
   ]);
 
-  const days = new Set<string>();
+  const blockedSet = new Set<string>();
+  const mineSet = new Set<string>();
 
   for (const b of blocked) {
     // Closed range — clamp to [from, to-1]
@@ -178,7 +187,7 @@ export async function listBlockedDays(args: ListBlockedDaysArgs): Promise<string
     const endExclusive = addDays(b.dateEnd, 1);
     const clampedEnd = endExclusive > to ? to : endExclusive;
     for (const day of nightsBetween(start, clampedEnd)) {
-      days.add(day);
+      blockedSet.add(day);
     }
   }
 
@@ -186,12 +195,23 @@ export async function listBlockedDays(args: ListBlockedDaysArgs): Promise<string
     // Half-open range — clamp to [from, to)
     const start = b.checkIn < from ? from : b.checkIn;
     const end = b.checkOut > to ? to : b.checkOut;
+    const target = guestId && b.guestId === guestId ? mineSet : blockedSet;
     for (const day of nightsBetween(start, end)) {
-      days.add(day);
+      target.add(day);
     }
   }
 
-  return Array.from(days).sort();
+  // Make sure mine and blocked are disjoint — a manually blocked
+  // day that overlaps one of my own bookings shouldn't appear as
+  // "yours" since you can't actually free it.
+  for (const day of mineSet) {
+    if (blockedSet.has(day)) mineSet.delete(day);
+  }
+
+  return {
+    blocked: Array.from(blockedSet).sort(),
+    mine: Array.from(mineSet).sort(),
+  };
 }
 
 // Re-export so route handlers don't need to import from two places.

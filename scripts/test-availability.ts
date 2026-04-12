@@ -153,16 +153,21 @@ async function main() {
       );
     }
     {
-      const days = await listBlockedDays({
+      const result = await listBlockedDays({
         propertyId: property.id,
         from: checkIn,
         to: addDays(checkIn, 5),
       });
       assert(
         "listBlockedDays includes both blocked days",
-        days.includes(formatISODate(addDays(checkIn, 2))) &&
-          days.includes(formatISODate(addDays(checkIn, 3))),
-        days,
+        result.blocked.includes(formatISODate(addDays(checkIn, 2))) &&
+          result.blocked.includes(formatISODate(addDays(checkIn, 3))),
+        result,
+      );
+      assert(
+        "listBlockedDays returns empty mine when no guestId",
+        result.mine.length === 0,
+        result,
       );
     }
   } finally {
