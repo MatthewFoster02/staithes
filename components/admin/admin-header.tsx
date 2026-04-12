@@ -4,7 +4,10 @@ import { signOutAction } from "@/lib/auth/actions";
 // Nav links are filtered to only the routes that actually exist.
 // Each item in this list maps to a real /admin/<slug> page; we add
 // entries here as we build them through Phase 3 and beyond.
-const NAV_ITEMS = [{ href: "/admin/dashboard", label: "Dashboard" }];
+const NAV_ITEMS = [
+  { href: "/admin/dashboard", label: "Dashboard" },
+  { href: "/admin/bookings", label: "Bookings" },
+];
 
 export function AdminHeader({ firstName }: { firstName: string | null }) {
   return (
