@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
 import { siteUrl } from "@/lib/seo/site";
+import { safeNext } from "@/lib/auth/safe-redirect";
 
 // ---------------------------------------------------------------------------
 // Form schemas
@@ -92,8 +93,9 @@ export async function signUpAction(_prev: AuthActionResult | null, formData: For
     return { ok: true, needsConfirmation: true };
   }
 
+  const next = safeNext(formData.get("next") as string | null, "/dashboard");
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+  redirect(next);
 }
 
 export async function signInAction(_prev: AuthActionResult | null, formData: FormData): Promise<AuthActionResult> {
@@ -111,8 +113,9 @@ export async function signInAction(_prev: AuthActionResult | null, formData: For
     return { ok: false, error: error.message };
   }
 
+  const next = safeNext(formData.get("next") as string | null, "/dashboard");
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+  redirect(next);
 }
 
 export async function magicLinkAction(_prev: AuthActionResult | null, formData: FormData): Promise<AuthActionResult> {

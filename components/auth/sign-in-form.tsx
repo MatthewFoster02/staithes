@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { signInAction, magicLinkAction, type AuthActionResult } from "@/lib/auth/actions";
 
-export function SignInForm() {
+export function SignInForm({ next }: { next?: string }) {
   const [passwordState, passwordAction, passwordPending] = useActionState<AuthActionResult | null, FormData>(
     signInAction,
     null,
@@ -19,6 +19,7 @@ export function SignInForm() {
   return (
     <div className="space-y-8">
       <form action={passwordAction} className="space-y-4">
+        {next && <input type="hidden" name="next" value={next} />}
         <div className="space-y-1">
           <label htmlFor="signin-email" className="text-sm font-medium">
             Email
@@ -89,7 +90,10 @@ export function SignInForm() {
 
       <p className="text-center text-sm text-neutral-600">
         Don&rsquo;t have an account?{" "}
-        <Link href="/signup" className="font-medium text-neutral-900 underline-offset-4 hover:underline">
+        <Link
+          href={next ? `/signup?next=${encodeURIComponent(next)}` : "/signup"}
+          className="font-medium text-neutral-900 underline-offset-4 hover:underline"
+        >
           Sign up
         </Link>
       </p>

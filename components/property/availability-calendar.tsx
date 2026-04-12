@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import type { DateRange, Matcher } from "react-day-picker";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
@@ -59,8 +60,7 @@ export function AvailabilityCalendar({
   const [children, setChildren] = React.useState(0);
   const [breakdown, setBreakdown] = React.useState<PriceBreakdown | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [reserving, setReserving] = React.useState(false);
-  const [reserveError, setReserveError] = React.useState<string | null>(null);
+  const router = useRouter();
 
   // Fetch the year-long blocked-day list once on mount. The endpoint
   // also returns the current guest's own bookings (when signed in)
@@ -274,52 +274,39 @@ export function AvailabilityCalendar({
         </dl>
       )}
 
-      {isSignedIn ? (
-        <Button
-          className="mt-4 w-full"
-          disabled={!breakdown || !!error || reserving}
-          onClick={async () => {
-            if (!range?.from || !range?.to) return;
-            setReserving(true);
-            setReserveError(null);
-            try {
-              const res = await fetch("/api/bookings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  checkIn: formatISODate(range.from),
-                  checkOut: formatISODate(range.to),
-                  adults,
-                  children,
-                }),
-              });
-              const data = await res.json();
-              if (!res.ok || !data.checkoutUrl) {
-                setReserveError(data.error ?? "Could not start checkout.");
-                setReserving(false);
-                return;
-              }
-              window.location.href = data.checkoutUrl;
-            } catch {
-              setReserveError("Network error. Please try again.");
-              setReserving(false);
-            }
-          }}
-        >
-          {reserving ? "Redirecting to payment…" : breakdown ? "Reserve" : "Select dates"}
-        </Button>
-      ) : (
-        <a
-          href="/login?next=/"
-          className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          Sign in to book
-        </a>
-      )}
-
-      {reserveError && (
-        <p className="mt-3 text-sm text-red-600">{reserveError}</p>
-      )}
+      {(() => {
+        if (!range?.from || !range?.to || !breakdown || error) {
+          return (
+            <Button className="mt-4 w-full" disabled>
+              {breakdown ? "Reserve" : "Select dates"}
+            </Button>
+          );
+        }
+        const qs = new URLSearchParams({
+          checkIn: formatISODate(range.from),
+          checkOut: formatISODate(range.to),
+          adults: String(adults),
+          children: String(children),
+        }).toString();
+        if (isSignedIn) {
+          return (
+            <Button
+              className="mt-4 w-full"
+              onClick={() => router.push(`/book?${qs}`)}
+            >
+              Reserve
+            </Button>
+          );
+        }
+        return (
+          <a
+            href={`/login?next=${encodeURIComponent(`/book?${qs}`)}`}
+            className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Sign in to book
+          </a>
+        );
+      })()}
 
       <p className="mt-3 text-center text-xs text-neutral-500">
         You won&rsquo;t be charged until you confirm on the next page.
