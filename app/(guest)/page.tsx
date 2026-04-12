@@ -6,6 +6,7 @@ import {
   PropertyAmenities,
   type AmenityItem,
 } from "@/components/property/property-amenities";
+import { PropertyMap } from "@/components/property/property-map";
 import { Button } from "@/components/ui/button";
 
 export default async function HomePage() {
@@ -82,6 +83,18 @@ export default async function HomePage() {
               What this place offers
             </h2>
             <PropertyAmenities amenities={amenityItems} />
+          </section>
+
+          <section>
+            <h2 className="mb-1 text-xl font-semibold tracking-tight">
+              Where you&rsquo;ll be
+            </h2>
+            <p className="mb-4 text-sm text-neutral-600">{property.addressApprox}</p>
+            <PropertyMap
+              latitude={Number(property.latitude)}
+              longitude={Number(property.longitude)}
+              areaName={property.addressApprox}
+            />
           </section>
         </div>
 
