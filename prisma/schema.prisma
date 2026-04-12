@@ -327,6 +327,20 @@ model PricingRule {
   @@map("pricing_rules")
 }
 
+// Idempotency log for inbound Stripe webhooks. The Stripe event id
+// is the primary key, so re-delivery of the same event collides with
+// a unique-violation and the handler safely no-ops. Rows can be
+// pruned periodically — keeping a few months is plenty for debugging.
+model WebhookEvent {
+  id          String   @id
+  source      String   @default("stripe")
+  type        String
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@index([source, type, processedAt])
+  @@map("webhook_events")
+}
+
 // Singleton: exactly one row, enforced via a single fixed id at insert time.
 model SiteConfiguration {
   id              String   @id @default(uuid()) @db.Uuid
