@@ -8,7 +8,7 @@ import {
   type AmenityItem,
 } from "@/components/property/property-amenities";
 import { PropertyMap } from "@/components/property/property-map";
-import { Button } from "@/components/ui/button";
+import { AvailabilityCalendar } from "@/components/property/availability-calendar";
 import { propertyPhotoUrl } from "@/lib/storage/photos";
 import { siteUrl } from "@/lib/seo/site";
 
@@ -154,17 +154,13 @@ export default async function HomePage() {
         </div>
 
         <aside className="lg:sticky lg:top-6 lg:self-start">
-          <div className="rounded-2xl border border-neutral-200 p-6 shadow-sm">
-            <p className="text-sm text-neutral-500">From</p>
-            <p className="text-2xl font-semibold">
-              £{Number(property.baseNightlyRate).toFixed(0)}{" "}
-              <span className="text-base font-normal text-neutral-500">/ night</span>
-            </p>
-            <Button className="mt-4 w-full">Check availability</Button>
-            <p className="mt-3 text-center text-xs text-neutral-500">
-              Booking flow coming in Phase 2
-            </p>
-          </div>
+          <AvailabilityCalendar
+            baseNightlyRate={String(property.baseNightlyRate)}
+            currency={property.currency}
+            minStay={property.minStayDefault}
+            maxStay={property.maxStay}
+            maxGuests={property.maxGuests}
+          />
         </aside>
       </div>
     </article>
