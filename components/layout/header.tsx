@@ -1,6 +1,17 @@
 import Link from "next/link";
+import { getCurrentUser } from "@/lib/auth/server";
+import { prisma } from "@/lib/db/prisma";
+import { signOutAction } from "@/lib/auth/actions";
 
-export function Header() {
+export async function Header() {
+  const user = await getCurrentUser();
+  const guest = user
+    ? await prisma.guest.findUnique({
+        where: { id: user.id },
+        select: { firstName: true },
+      })
+    : null;
+
   return (
     <header className="border-b border-neutral-200">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
@@ -11,9 +22,30 @@ export function Header() {
           <Link href="/" className="hover:text-neutral-900">
             Home
           </Link>
-          <Link href="/login" className="hover:text-neutral-900">
-            Sign in
-          </Link>
+          {user ? (
+            <>
+              <Link href="/dashboard" className="hover:text-neutral-900">
+                Hi, {guest?.firstName ?? "guest"}
+              </Link>
+              <form action={signOutAction}>
+                <button
+                  type="submit"
+                  className="cursor-pointer text-neutral-600 hover:text-neutral-900"
+                >
+                  Sign out
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="hover:text-neutral-900">
+                Sign in
+              </Link>
+              <Link href="/signup" className="hover:text-neutral-900">
+                Sign up
+              </Link>
+            </>
+          )}
         </nav>
       </div>
     </header>
