@@ -413,6 +413,19 @@ model Message {
   @@map("messages")
 }
 
+// Daily idempotency key for the host summary email. The unique
+// constraint on `date` ensures the cron only ever sends one summary
+// per UTC day no matter how many times it fires (Vercel Cron is
+// at-least-once delivery). Rows accumulate slowly — one per day —
+// and can be pruned once a year if needed.
+model HostDailySummaryLog {
+  id     String   @id @default(uuid()) @db.Uuid
+  date   DateTime @unique @db.Date
+  sentAt DateTime @default(now()) @map("sent_at")
+
+  @@map("host_daily_summary_logs")
+}
+
 // Audit log of automated emails sent for a booking. The unique
 // constraint on (booking_id, email_type) is the *idempotency* key —
 // the scheduler tries to insert a row before sending; a unique
