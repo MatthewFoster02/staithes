@@ -103,6 +103,23 @@ enum MessageSenderType {
   system
 }
 
+enum AutomatedEmailType {
+  confirmation
+  pre_arrival
+  check_in_reminder
+  mid_stay
+  check_out_reminder
+  post_stay_thanks
+  review_request
+}
+
+enum AutomatedEmailStatus {
+  sent
+  delivered
+  bounced
+  failed
+}
+
 // ---------- Models ----------
 
 model Property {
@@ -236,11 +253,12 @@ model Booking {
   cancelledAt              DateTime?     @map("cancelled_at")
   completedAt              DateTime?     @map("completed_at")
 
-  property      Property              @relation(fields: [propertyId], references: [id])
-  guest         Guest                 @relation(fields: [guestId], references: [id])
-  priceSnapshot BookingPriceSnapshot?
-  payments      Payment[]
-  messageThread MessageThread?
+  property        Property              @relation(fields: [propertyId], references: [id])
+  guest           Guest                 @relation(fields: [guestId], references: [id])
+  priceSnapshot   BookingPriceSnapshot?
+  payments        Payment[]
+  messageThread   MessageThread?
+  automatedEmails AutomatedEmailLog[]
 
   @@index([propertyId, checkIn, checkOut, status])
   @@index([guestId])
@@ -393,6 +411,28 @@ model Message {
 
   @@index([threadId, createdAt])
   @@map("messages")
+}
+
+// Audit log of automated emails sent for a booking. The unique
+// constraint on (booking_id, email_type) is the *idempotency* key —
+// the scheduler tries to insert a row before sending; a unique
+// violation means another invocation has already claimed the send.
+// On Resend failure the row is deleted so the next cron tick retries.
+model AutomatedEmailLog {
+  id             String               @id @default(uuid()) @db.Uuid
+  bookingId      String               @map("booking_id") @db.Uuid
+  emailType      AutomatedEmailType   @map("email_type")
+  recipientEmail String               @map("recipient_email")
+  subject        String
+  status         AutomatedEmailStatus @default(sent)
+  sentAt         DateTime             @default(now()) @map("sent_at")
+  deliveredAt    DateTime?            @map("delivered_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, emailType])
+  @@index([sentAt])
+  @@map("automated_email_logs")
 }
 
 // Idempotency log for inbound Stripe webhooks. The Stripe event id
