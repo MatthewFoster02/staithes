@@ -10,6 +10,7 @@ import {
 import { PropertyMap } from "@/components/property/property-map";
 import { AvailabilityCalendar } from "@/components/property/availability-calendar";
 import { ContactHostButton } from "@/components/messaging/contact-host-button";
+import { PropertyReviews } from "@/components/reviews/property-reviews";
 import { getCurrentUser } from "@/lib/auth/server";
 import { propertyPhotoUrl } from "@/lib/storage/photos";
 import { siteUrl } from "@/lib/seo/site";
@@ -79,6 +80,37 @@ export default async function HomePage() {
     }),
     getCurrentUser(),
   ]);
+
+  // Reviews lookups happen in parallel with the rest of the page in
+  // a separate block because they depend on `property` existing.
+  const reviewsData = property
+    ? await Promise.all([
+        prisma.review.findMany({
+          where: { propertyId: property.id, isPublished: true },
+          include: { guest: { select: { firstName: true, lastName: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 6,
+        }),
+        prisma.review.aggregate({
+          where: { propertyId: property.id, isPublished: true },
+          _avg: { ratingOverall: true },
+          _count: { _all: true },
+        }),
+      ])
+    : null;
+  const reviewRows = (reviewsData?.[0] ?? []).map((r) => ({
+    id: r.id,
+    guestFirstName: r.guest.firstName,
+    guestLastInitial: r.guest.lastName.charAt(0),
+    ratingOverall: Number(r.ratingOverall),
+    reviewText: r.reviewText,
+    hostResponse: r.hostResponse,
+    createdAt: r.createdAt,
+  }));
+  const reviewCount = reviewsData?.[1]._count._all ?? 0;
+  const reviewAverage = reviewsData?.[1]._avg.ratingOverall
+    ? Number(reviewsData[1]._avg.ratingOverall)
+    : null;
 
   if (!property) {
     return (
@@ -157,6 +189,15 @@ export default async function HomePage() {
               latitude={Number(property.latitude)}
               longitude={Number(property.longitude)}
               areaName={property.addressApprox}
+            />
+          </section>
+
+          <section>
+            <h2 className="mb-4 text-xl font-semibold tracking-tight">Reviews</h2>
+            <PropertyReviews
+              averageOverall={reviewAverage}
+              count={reviewCount}
+              reviews={reviewRows}
             />
           </section>
         </div>
