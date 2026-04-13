@@ -19,14 +19,28 @@ export default async function AdminLayout({
   if (!user) redirect("/login?next=/admin/dashboard");
   if (!isHostEmail(user.email)) redirect("/dashboard");
 
-  const guest = await prisma.guest.findUnique({
-    where: { id: user.id },
-    select: { firstName: true },
-  });
+  const [guest, unreadMessages] = await Promise.all([
+    prisma.guest.findUnique({
+      where: { id: user.id },
+      select: { firstName: true },
+    }),
+    // Count unread guest messages across all threads for the property.
+    // Single-property site so we don't have to filter by propertyId
+    // explicitly — every thread belongs to the only property.
+    prisma.message.count({
+      where: {
+        isRead: false,
+        senderType: "guest",
+      },
+    }),
+  ]);
 
   return (
     <div className="flex min-h-full flex-col bg-neutral-50">
-      <AdminHeader firstName={guest?.firstName ?? null} />
+      <AdminHeader
+        firstName={guest?.firstName ?? null}
+        unreadMessages={unreadMessages}
+      />
       <div className="flex-1">{children}</div>
     </div>
   );

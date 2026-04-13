@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { signOutAction } from "@/lib/auth/actions";
 
-// Nav links are filtered to only the routes that actually exist.
-// Each item in this list maps to a real /admin/<slug> page; we add
-// entries here as we build them through Phase 3 and beyond.
 const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "Dashboard" },
   { href: "/admin/bookings", label: "Bookings" },
   { href: "/admin/calendar", label: "Calendar" },
 ];
 
-export function AdminHeader({ firstName }: { firstName: string | null }) {
+interface AdminHeaderProps {
+  firstName: string | null;
+  unreadMessages: number;
+}
+
+export function AdminHeader({ firstName, unreadMessages }: AdminHeaderProps) {
   return (
     <header className="border-b border-neutral-200 bg-neutral-900 text-neutral-100">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
@@ -23,6 +25,14 @@ export function AdminHeader({ firstName }: { firstName: string | null }) {
               {item.label}
             </Link>
           ))}
+          <Link href="/admin/messages" className="relative hover:text-white">
+            Messages
+            {unreadMessages > 0 && (
+              <span className="absolute -top-2 -right-3 inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-semibold text-white">
+                {unreadMessages}
+              </span>
+            )}
+          </Link>
           <Link href="/" className="hover:text-white">
             View site
           </Link>
