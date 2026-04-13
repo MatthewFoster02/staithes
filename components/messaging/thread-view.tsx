@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import type { MessageSenderType } from "@/lib/generated/prisma/client";
 import { Button } from "@/components/ui/button";
+import { getSupabaseBrowserClient } from "@/lib/auth/browser";
 
 export interface ThreadViewMessage {
   id: string;
@@ -26,6 +27,16 @@ interface ThreadViewProps {
   canSend: boolean;
 }
 
+// Shape of the postgres_changes payload for a `messages` insert.
+// We only pull the columns we render so the cast can be loose.
+interface RealtimeMessageRow {
+  id: string;
+  thread_id: string;
+  sender_type: MessageSenderType;
+  content: string;
+  created_at: string;
+}
+
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleString("en-GB", {
     day: "numeric",
@@ -35,18 +46,66 @@ function formatTime(iso: string): string {
   });
 }
 
-export function ThreadView({ messages, mySide, postUrl, canSend }: ThreadViewProps) {
+export function ThreadView({ threadId, messages: initialMessages, mySide, postUrl, canSend }: ThreadViewProps) {
   const router = useRouter();
+  const [messages, setMessages] = React.useState<ThreadViewMessage[]>(initialMessages);
   const [content, setContent] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
+
+  // Re-sync local state when the parent re-renders with new initial
+  // messages (e.g., after a router.refresh() following navigation).
+  React.useEffect(() => {
+    setMessages(initialMessages);
+  }, [initialMessages]);
 
   // Scroll to bottom on mount + whenever the message list grows.
   React.useEffect(() => {
     if (!scrollRef.current) return;
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages.length]);
+
+  // Realtime subscription: append any new message inserted on this
+  // thread, deduping by id so optimistic locally-added messages and
+  // realtime-echoed messages don't show up twice.
+  React.useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    const channel = supabase
+      .channel(`thread:${threadId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `thread_id=eq.${threadId}`,
+        },
+        (payload: { new: RealtimeMessageRow }) => {
+          const row = payload.new;
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === row.id)) return prev;
+            return [
+              ...prev,
+              {
+                id: row.id,
+                senderType: row.sender_type,
+                content: row.content,
+                createdAt: row.created_at,
+              },
+            ];
+          });
+          // Trigger a server-side refetch so the read-marker side
+          // effect runs (readThread flips isRead). Cheap call, fine.
+          router.refresh();
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadId]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -66,8 +125,25 @@ export function ThreadView({ messages, mySide, postUrl, canSend }: ThreadViewPro
         setSubmitting(false);
         return;
       }
+      // Optimistically append our own message so the sender sees it
+      // without waiting for the realtime echo round-trip. The
+      // dedup-by-id guard in the realtime handler stops it appearing
+      // twice when the broadcast lands.
+      if (data.messageId) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === data.messageId)) return prev;
+          return [
+            ...prev,
+            {
+              id: data.messageId,
+              senderType: mySide,
+              content: trimmed,
+              createdAt: new Date().toISOString(),
+            },
+          ];
+        });
+      }
       setContent("");
-      router.refresh();
       setSubmitting(false);
     } catch {
       setError("Network error. Please try again.");

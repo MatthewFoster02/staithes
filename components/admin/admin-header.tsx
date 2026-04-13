@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { signOutAction } from "@/lib/auth/actions";
+import { LiveUnreadBadge } from "@/components/messaging/live-unread-badge";
 
 const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "Dashboard" },
@@ -27,11 +28,7 @@ export function AdminHeader({ firstName, unreadMessages }: AdminHeaderProps) {
           ))}
           <Link href="/admin/messages" className="relative hover:text-white">
             Messages
-            {unreadMessages > 0 && (
-              <span className="absolute -top-2 -right-3 inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-semibold text-white">
-                {unreadMessages}
-              </span>
-            )}
+            <LiveUnreadBadge initialCount={unreadMessages} colorClass="bg-emerald-500" />
           </Link>
           <Link href="/" className="hover:text-white">
             View site

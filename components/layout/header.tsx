@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/server";
 import { prisma } from "@/lib/db/prisma";
 import { signOutAction } from "@/lib/auth/actions";
+import { LiveUnreadBadge } from "@/components/messaging/live-unread-badge";
 
 export async function Header() {
   const user = await getCurrentUser();
@@ -43,11 +44,7 @@ export async function Header() {
                 className="relative hover:text-neutral-900"
               >
                 Messages
-                {unreadMessages > 0 && (
-                  <span className="absolute -top-2 -right-3 inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-semibold text-white">
-                    {unreadMessages}
-                  </span>
-                )}
+                <LiveUnreadBadge initialCount={unreadMessages} />
               </Link>
               <Link href="/dashboard" className="hover:text-neutral-900">
                 Hi, {guest?.firstName ?? "guest"}
