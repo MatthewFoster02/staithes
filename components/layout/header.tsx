@@ -5,12 +5,26 @@ import { signOutAction } from "@/lib/auth/actions";
 
 export async function Header() {
   const user = await getCurrentUser();
-  const guest = user
-    ? await prisma.guest.findUnique({
-        where: { id: user.id },
-        select: { firstName: true },
-      })
-    : null;
+
+  // Run the signed-in lookups in parallel: profile + unread message
+  // count. The unread count is the number of guest-side messages from
+  // the OTHER side that haven't been read yet, in any of this guest's
+  // threads.
+  const [guest, unreadMessages] = user
+    ? await Promise.all([
+        prisma.guest.findUnique({
+          where: { id: user.id },
+          select: { firstName: true },
+        }),
+        prisma.message.count({
+          where: {
+            isRead: false,
+            senderType: { in: ["host", "system"] },
+            thread: { guestId: user.id },
+          },
+        }),
+      ])
+    : [null, 0];
 
   return (
     <header className="border-b border-neutral-200">
@@ -24,6 +38,17 @@ export async function Header() {
           </Link>
           {user ? (
             <>
+              <Link
+                href="/dashboard/messages"
+                className="relative hover:text-neutral-900"
+              >
+                Messages
+                {unreadMessages > 0 && (
+                  <span className="absolute -top-2 -right-3 inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-semibold text-white">
+                    {unreadMessages}
+                  </span>
+                )}
+              </Link>
               <Link href="/dashboard" className="hover:text-neutral-900">
                 Hi, {guest?.firstName ?? "guest"}
               </Link>

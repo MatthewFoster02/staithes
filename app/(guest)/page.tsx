@@ -9,6 +9,7 @@ import {
 } from "@/components/property/property-amenities";
 import { PropertyMap } from "@/components/property/property-map";
 import { AvailabilityCalendar } from "@/components/property/availability-calendar";
+import { ContactHostButton } from "@/components/messaging/contact-host-button";
 import { getCurrentUser } from "@/lib/auth/server";
 import { propertyPhotoUrl } from "@/lib/storage/photos";
 import { siteUrl } from "@/lib/seo/site";
@@ -107,14 +108,17 @@ export default async function HomePage() {
 
   return (
     <article className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
-      <header className="mb-6">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-          {property.name}
-        </h1>
-        {property.shortDescription && (
-          <p className="mt-2 text-lg text-neutral-600">{property.shortDescription}</p>
-        )}
-        <p className="mt-1 text-sm text-neutral-500">{property.addressApprox}</p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+            {property.name}
+          </h1>
+          {property.shortDescription && (
+            <p className="mt-2 text-lg text-neutral-600">{property.shortDescription}</p>
+          )}
+          <p className="mt-1 text-sm text-neutral-500">{property.addressApprox}</p>
+        </div>
+        <ContactHostButton isSignedIn={!!user} />
       </header>
 
       <PhotoGallery photos={galleryPhotos} />
