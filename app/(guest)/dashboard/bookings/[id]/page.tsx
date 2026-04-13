@@ -8,6 +8,8 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { propertyPhotoUrl } from "@/lib/storage/photos";
 import { differenceInDays, formatISODate } from "@/lib/availability/dates";
 import { BookingStatusBadge } from "@/components/booking/status-badge";
+import { ReviewForm } from "@/components/reviews/review-form";
+import { todayUTC } from "@/lib/availability/dates";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
 export const metadata: Metadata = {
@@ -51,6 +53,7 @@ export default async function BookingDetailPage({ params }: PageProps) {
       property: { include: { photos: { orderBy: { sortOrder: "asc" }, take: 1 } } },
       priceSnapshot: true,
       payments: { orderBy: { createdAt: "asc" } },
+      review: true,
     },
   });
 
@@ -73,6 +76,12 @@ export default async function BookingDetailPage({ params }: PageProps) {
   // is confirmed (per the data model spec). Pending bookings see the
   // approximate location only.
   const showFullAddress = booking.status === "confirmed" || booking.status === "completed";
+
+  // Reviewable when the stay is over and there isn't already a review.
+  const eligibleForReview =
+    !booking.review &&
+    (booking.status === "confirmed" || booking.status === "completed") &&
+    booking.checkOut <= todayUTC();
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -160,6 +169,27 @@ export default async function BookingDetailPage({ params }: PageProps) {
             <section className="rounded-2xl border border-neutral-200 p-5">
               <h2 className="mb-3 text-base font-semibold">Your message to the host</h2>
               <p className="whitespace-pre-line text-sm text-neutral-700">{booking.guestMessage}</p>
+            </section>
+          )}
+
+          {eligibleForReview && (
+            <section className="rounded-2xl border border-neutral-200 p-5">
+              <h2 className="mb-3 text-base font-semibold">Leave a review</h2>
+              <ReviewForm bookingId={booking.id} />
+            </section>
+          )}
+
+          {booking.review && (
+            <section className="rounded-2xl border border-neutral-200 bg-emerald-50 p-5">
+              <h2 className="mb-2 text-base font-semibold">Your review</h2>
+              <p className="text-sm text-neutral-700">
+                You rated this stay <strong>{Number(booking.review.ratingOverall).toFixed(1)} / 5</strong>.
+              </p>
+              {booking.review.reviewText && (
+                <p className="mt-2 whitespace-pre-line text-sm text-neutral-700">
+                  &ldquo;{booking.review.reviewText}&rdquo;
+                </p>
+              )}
             </section>
           )}
 
