@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "Dashboard" },
   { href: "/admin/bookings", label: "Bookings" },
   { href: "/admin/calendar", label: "Calendar" },
+  { href: "/admin/reviews", label: "Reviews" },
 ];
 
 interface AdminHeaderProps {
