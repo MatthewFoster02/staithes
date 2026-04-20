@@ -8,9 +8,12 @@ interface ReviewFormProps {
   checkOut: string;
   adults: number;
   numChildren: number;
+  /** When false, the button says "Request to book" and the submit
+   *  flow routes the guest to their dashboard rather than Stripe. */
+  instantBookingEnabled: boolean;
 }
 
-export function BookingReviewForm({ checkIn, checkOut, adults, numChildren }: ReviewFormProps) {
+export function BookingReviewForm({ checkIn, checkOut, adults, numChildren, instantBookingEnabled }: ReviewFormProps) {
   const [guestMessage, setGuestMessage] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -32,12 +35,23 @@ export function BookingReviewForm({ checkIn, checkOut, adults, numChildren }: Re
         }),
       });
       const data = await res.json();
-      if (!res.ok || !data.checkoutUrl) {
-        setError(data.error ?? "Could not start checkout.");
+      if (!res.ok) {
+        setError(data.error ?? "Could not submit booking.");
         setSubmitting(false);
         return;
       }
-      window.location.href = data.checkoutUrl;
+      // Two paths: instant-booking returns a Stripe URL to redirect
+      // to; request-to-book returns { requiresApproval: true } and
+      // we send the guest to their dashboard booking detail where a
+      // "awaiting host approval" banner explains what's next.
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else if (data.bookingId) {
+        window.location.href = `/dashboard/bookings/${data.bookingId}`;
+      } else {
+        setError("Could not continue — please try again.");
+        setSubmitting(false);
+      }
     } catch {
       setError("Network error. Please try again.");
       setSubmitting(false);
@@ -66,10 +80,18 @@ export function BookingReviewForm({ checkIn, checkOut, adults, numChildren }: Re
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <Button type="submit" className="w-full" disabled={submitting}>
-        {submitting ? "Redirecting to payment…" : "Continue to payment"}
+        {submitting
+          ? instantBookingEnabled
+            ? "Redirecting to payment…"
+            : "Sending request…"
+          : instantBookingEnabled
+            ? "Continue to payment"
+            : "Request to book"}
       </Button>
       <p className="text-center text-xs text-neutral-500">
-        You won&rsquo;t be charged until you confirm on the next page.
+        {instantBookingEnabled
+          ? "You won't be charged until you confirm on the next page."
+          : "The host will review your request. If approved, you'll get an email with a payment link."}
       </p>
     </form>
   );

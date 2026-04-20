@@ -149,9 +149,13 @@ model Property {
   extraGuestFee      Decimal            @default(0) @map("extra_guest_fee") @db.Decimal(10, 2)
   baseGuestCount     Int                @map("base_guest_count")
   currency           String             @default("GBP") @db.Char(3)
-  houseRules         String?            @map("house_rules")
-  cancellationPolicy CancellationPolicy @default(moderate) @map("cancellation_policy")
-  status             PropertyStatus     @default(active)
+  houseRules             String?            @map("house_rules")
+  cancellationPolicy     CancellationPolicy @default(moderate) @map("cancellation_policy")
+  status                 PropertyStatus     @default(active)
+  // When true, guests pay immediately on the booking flow. When
+  // false, booking creation puts the reservation in request state
+  // and waits for host approval before a Stripe session is made.
+  instantBookingEnabled  Boolean            @default(true) @map("instant_booking_enabled")
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
@@ -257,6 +261,10 @@ model Booking {
   confirmedAt              DateTime?     @map("confirmed_at")
   cancelledAt              DateTime?     @map("cancelled_at")
   completedAt              DateTime?     @map("completed_at")
+  // Set when the host approves a request-to-book booking. Remains
+  // null until approval; also null for instant bookings (they skip
+  // this state and go straight to confirmed via the Stripe webhook).
+  approvedAt               DateTime?     @map("approved_at")
 
   property        Property              @relation(fields: [propertyId], references: [id])
   guest           Guest                 @relation(fields: [guestId], references: [id])

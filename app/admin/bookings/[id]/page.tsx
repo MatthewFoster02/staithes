@@ -8,6 +8,7 @@ import { propertyPhotoUrl } from "@/lib/storage/photos";
 import { differenceInDays, formatISODate } from "@/lib/availability/dates";
 import { BookingStatusBadge } from "@/components/booking/status-badge";
 import { CancelBookingButton } from "@/components/booking/cancel-booking-button";
+import { RequestApprovalButtons } from "@/components/admin/request-approval-buttons";
 import { groupNightlyRates } from "@/lib/pricing/display";
 import { previewRefund } from "@/lib/booking/cancel";
 import { todayUTC } from "@/lib/availability/dates";
@@ -310,6 +311,19 @@ export default async function AdminBookingDetailPage({ params }: PageProps) {
               </ul>
             )}
           </section>
+
+          {booking.bookingType === "request" &&
+            booking.status === "pending" &&
+            !booking.approvedAt && (
+              <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                <h2 className="mb-2 text-base font-semibold">Booking request</h2>
+                <p className="mb-3 text-sm text-neutral-700">
+                  The guest has requested to book these dates. Approve to
+                  send them a payment link, or decline to cancel.
+                </p>
+                <RequestApprovalButtons bookingId={booking.id} />
+              </section>
+            )}
 
           {eligibleForCancel && refundPreview && (
             <section className="rounded-2xl border border-neutral-200 bg-white p-5">

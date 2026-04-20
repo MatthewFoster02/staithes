@@ -210,6 +210,25 @@ export default async function BookingDetailPage({ params }: PageProps) {
             </section>
           )}
 
+          {booking.bookingType === "request" && booking.status === "pending" && (
+            <section
+              className={`rounded-2xl border p-5 ${
+                booking.approvedAt
+                  ? "border-emerald-200 bg-emerald-50"
+                  : "border-amber-200 bg-amber-50"
+              }`}
+            >
+              <h2 className="mb-2 text-base font-semibold">
+                {booking.approvedAt ? "Approved — complete payment" : "Awaiting host approval"}
+              </h2>
+              <p className="text-sm text-neutral-700">
+                {booking.approvedAt
+                  ? "The host has approved your request. Check your email for the payment link — the booking is only held for 24 hours after approval."
+                  : "Your request has been sent to the host. You'll get an email with a payment link once they approve."}
+              </p>
+            </section>
+          )}
+
           {eligibleForCancel && refundPreview && (
             <section className="rounded-2xl border border-neutral-200 p-5">
               <h2 className="mb-2 text-base font-semibold">Cancel</h2>

@@ -143,6 +143,7 @@ export default async function BookPage({ searchParams }: PageProps) {
               checkOut={parsed.data.checkOut}
               adults={parsed.data.adults}
               numChildren={parsed.data.children ?? 0}
+              instantBookingEnabled={property.instantBookingEnabled}
             />
           </section>
         </div>

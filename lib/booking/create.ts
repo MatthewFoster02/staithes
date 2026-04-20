@@ -20,7 +20,8 @@ export interface CreateBookingArgs {
 }
 
 export type CreateBookingResult =
-  | { ok: true; bookingId: string; checkoutUrl: string }
+  | { ok: true; bookingId: string; checkoutUrl: string; requiresApproval: false }
+  | { ok: true; bookingId: string; checkoutUrl: null; requiresApproval: true }
   | { ok: false; error: string; status: number };
 
 // Held bookings expire after this many minutes if the guest doesn't
@@ -90,6 +91,7 @@ export async function createBooking(args: CreateBookingArgs): Promise<CreateBook
           checkInTime: true,
           checkOutTime: true,
           name: true,
+          instantBookingEnabled: true,
         },
       });
 
@@ -102,7 +104,7 @@ export async function createBooking(args: CreateBookingArgs): Promise<CreateBook
           numGuestsAdults: numAdults,
           numGuestsChildren: numChildren,
           status: "pending",
-          bookingType: "instant",
+          bookingType: property.instantBookingEnabled ? "instant" : "request",
           totalPrice: new Decimal(breakdown.total),
           currency: breakdown.currency,
           cancellationPolicySnapshot: {
@@ -152,12 +154,20 @@ export async function createBooking(args: CreateBookingArgs): Promise<CreateBook
         bookingId: booking.id,
         currency: breakdown.currency,
         items,
+        instantBookingEnabled: property.instantBookingEnabled,
       };
     });
 
     bookingId = result.bookingId;
     currency = result.currency;
     lineItems = result.items;
+
+    // Request-to-book property: booking is created in "request"
+    // state and waits for host approval. No Stripe session yet —
+    // that's created when the host approves.
+    if (!result.instantBookingEnabled) {
+      return { ok: true, bookingId, checkoutUrl: null, requiresApproval: true };
+    }
   } catch (e) {
     if (e instanceof BookingError) {
       return { ok: false, error: e.message, status: e.status };
@@ -201,7 +211,7 @@ export async function createBooking(args: CreateBookingArgs): Promise<CreateBook
       return { ok: false, error: "Could not create payment session.", status: 500 };
     }
 
-    return { ok: true, bookingId, checkoutUrl: session.url };
+    return { ok: true, bookingId, checkoutUrl: session.url, requiresApproval: false };
   } catch (e) {
     // Roll back the pending booking so the dates are released
     // immediately rather than waiting for the cron sweep.

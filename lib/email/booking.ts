@@ -1,6 +1,7 @@
 import { resend, senderEmail } from "@/lib/email/client";
 import { BookingConfirmationEmail } from "@/lib/email/templates/booking-confirmation";
 import { BookingCancelledEmail } from "@/lib/email/templates/booking-cancelled";
+import { RequestApprovedEmail } from "@/lib/email/templates/request-approved";
 import { formatISODate, differenceInDays } from "@/lib/availability/dates";
 
 interface SendBookingConfirmationArgs {
@@ -103,5 +104,49 @@ export async function sendBookingCancelledEmail(
     console.log(`[email] sent cancellation to ${args.guestEmail} (${args.bookingId})`);
   } catch (err) {
     console.error(`[email] failed to send cancellation to ${args.guestEmail}:`, err);
+  }
+}
+
+interface SendBookingRequestApprovedArgs {
+  bookingId: string;
+  guestEmail: string;
+  guestFirstName: string;
+  propertyName: string;
+  checkIn: Date;
+  checkOut: Date;
+  totalPrice: string;
+  currency: string;
+  paymentUrl: string;
+}
+
+// Sent when the host approves a request-to-book booking. Contains
+// the Stripe payment link the guest needs to click to complete the
+// booking.
+export async function sendBookingRequestApprovedEmail(
+  args: SendBookingRequestApprovedArgs,
+): Promise<void> {
+  try {
+    const { error } = await resend.emails.send({
+      from: senderEmail(),
+      to: args.guestEmail,
+      subject: `Your request at ${args.propertyName} is approved — complete payment`,
+      react: RequestApprovedEmail({
+        guestFirstName: args.guestFirstName,
+        propertyName: args.propertyName,
+        checkInISO: formatISODate(args.checkIn),
+        checkOutISO: formatISODate(args.checkOut),
+        totalPrice: args.totalPrice,
+        currency: args.currency,
+        paymentUrl: args.paymentUrl,
+        bookingReference: args.bookingId.slice(0, 8).toUpperCase(),
+      }),
+    });
+    if (error) {
+      console.error(`[email] Resend rejected approval email for ${args.guestEmail}:`, error);
+      return;
+    }
+    console.log(`[email] sent request-approved to ${args.guestEmail} (${args.bookingId})`);
+  } catch (err) {
+    console.error(`[email] failed to send approval email to ${args.guestEmail}:`, err);
   }
 }

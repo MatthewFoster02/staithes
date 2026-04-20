@@ -8,13 +8,17 @@ import { prisma } from "@/lib/db/prisma";
 // tab and Stripe takes its time emitting checkout.session.expired).
 export const PENDING_TTL_MINUTES = 30;
 
-// Sweeps and cancels all stale pending bookings. Returns a count for
-// observability. Idempotent — re-running it is a no-op.
+// Sweeps stale pending INSTANT bookings. Request-to-book bookings
+// are deliberately excluded: unapproved ones are waiting for the
+// host (who may take hours or days to respond), and approved-but-
+// unpaid ones have their own 24-hour Stripe session expires_at and
+// get cleaned up via the checkout.session.expired webhook. Idempotent.
 export async function expireStalePendingBookings(): Promise<{ cancelled: number }> {
   const cutoff = new Date(Date.now() - PENDING_TTL_MINUTES * 60 * 1000);
   const result = await prisma.booking.updateMany({
     where: {
       status: "pending",
+      bookingType: "instant",
       createdAt: { lt: cutoff },
     },
     data: {
