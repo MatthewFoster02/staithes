@@ -10,6 +10,8 @@ import {
   formatISODate,
   todayUTC,
 } from "@/lib/availability/dates";
+import { groupNightlyRates } from "@/lib/pricing/display";
+import type { NightlyRate } from "@/lib/pricing/calculate";
 
 interface AvailabilityCalendarProps {
   baseNightlyRate: string;
@@ -25,8 +27,11 @@ interface PriceBreakdown {
   subtotalAccommodation: string;
   cleaningFee: string;
   extraGuestFeeTotal: string;
+  discountAmount: string;
+  discountDescription: string | null;
   total: string;
   currency: string;
+  nightlyRates: NightlyRate[];
 }
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -251,12 +256,18 @@ export function AvailabilityCalendar({
 
       {breakdown && !error && (
         <dl className="mt-4 space-y-1 text-sm text-neutral-700">
-          <div className="flex justify-between">
-            <dt>
-              {formatMoney(baseNightlyRate, currency)} × {breakdown.numNights} nights
-            </dt>
-            <dd>{formatMoney(breakdown.subtotalAccommodation, currency)}</dd>
-          </div>
+          {/* One line per rate group so mixed-rate stays are legible
+              ("£145 × 3", "£200 × 4" etc). When every night is the
+              same rate this collapses back to the familiar single line. */}
+          {groupNightlyRates(breakdown.nightlyRates).map((group, i) => (
+            <div key={i} className="flex justify-between">
+              <dt>
+                {formatMoney(group.rate, currency)} × {group.nights}{" "}
+                {group.nights === 1 ? "night" : "nights"}
+              </dt>
+              <dd>{formatMoney(group.subtotal, currency)}</dd>
+            </div>
+          ))}
           {Number(breakdown.extraGuestFeeTotal) > 0 && (
             <div className="flex justify-between">
               <dt>Extra guests</dt>
@@ -267,6 +278,12 @@ export function AvailabilityCalendar({
             <dt>Cleaning fee</dt>
             <dd>{formatMoney(breakdown.cleaningFee, currency)}</dd>
           </div>
+          {Number(breakdown.discountAmount) > 0 && (
+            <div className="flex justify-between text-emerald-700">
+              <dt>{breakdown.discountDescription ?? "Discount"}</dt>
+              <dd>−{formatMoney(breakdown.discountAmount, currency)}</dd>
+            </div>
+          )}
           <div className="mt-2 flex justify-between border-t border-neutral-200 pt-2 text-base font-semibold text-neutral-900">
             <dt>Total ({guestsLabel})</dt>
             <dd>{formatMoney(breakdown.total, currency)}</dd>

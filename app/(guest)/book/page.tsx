@@ -10,6 +10,7 @@ import { calculatePrice } from "@/lib/pricing/calculate";
 import { parseISODate } from "@/lib/availability/dates";
 import { propertyPhotoUrl } from "@/lib/storage/photos";
 import { BookingReviewForm } from "@/components/booking/review-form";
+import { groupNightlyRates } from "@/lib/pricing/display";
 
 export const metadata: Metadata = {
   title: "Review your booking",
@@ -149,10 +150,13 @@ export default async function BookPage({ searchParams }: PageProps) {
         <aside className="md:w-64">
           <dl className="space-y-2 rounded-2xl border border-neutral-200 bg-neutral-50 p-5 text-sm">
             <p className="mb-3 text-base font-semibold text-neutral-900">Price details</p>
-            <Row
-              label={`${formatMoney(breakdown.nightlyRates[0]?.rate ?? "0", breakdown.currency)} × ${breakdown.numNights} nights`}
-              value={formatMoney(breakdown.subtotalAccommodation, breakdown.currency)}
-            />
+            {groupNightlyRates(breakdown.nightlyRates).map((group, i) => (
+              <Row
+                key={i}
+                label={`${formatMoney(group.rate, breakdown.currency)} × ${group.nights} ${group.nights === 1 ? "night" : "nights"}`}
+                value={formatMoney(group.subtotal, breakdown.currency)}
+              />
+            ))}
             {Number(breakdown.extraGuestFeeTotal) > 0 && (
               <Row
                 label="Extra guests"
@@ -163,6 +167,12 @@ export default async function BookPage({ searchParams }: PageProps) {
               label="Cleaning fee"
               value={formatMoney(breakdown.cleaningFee, breakdown.currency)}
             />
+            {Number(breakdown.discountAmount) > 0 && (
+              <Row
+                label={breakdown.discountDescription ?? "Discount"}
+                value={`−${formatMoney(breakdown.discountAmount, breakdown.currency)}`}
+              />
+            )}
             <div className="my-2 border-t border-neutral-200" />
             <Row
               label="Total"

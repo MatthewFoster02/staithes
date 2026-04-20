@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db/prisma";
 import { propertyPhotoUrl } from "@/lib/storage/photos";
 import { differenceInDays, formatISODate } from "@/lib/availability/dates";
 import { BookingStatusBadge } from "@/components/booking/status-badge";
+import { groupNightlyRates } from "@/lib/pricing/display";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
 export const metadata: Metadata = {
@@ -75,7 +76,7 @@ export default async function AdminBookingDetailPage({ params }: PageProps) {
   const snapshot = booking.priceSnapshot;
   const nightlyRates =
     (snapshot?.nightlyRates as Prisma.JsonValue as NightlyRate[] | null) ?? null;
-  const firstNightlyRate = nightlyRates?.[0]?.rate ?? null;
+  const rateGroups = nightlyRates ? groupNightlyRates(nightlyRates) : [];
 
   return (
     <article className="mx-auto max-w-5xl px-6 py-10">
@@ -215,10 +216,20 @@ export default async function AdminBookingDetailPage({ params }: PageProps) {
             <h2 className="mb-3 text-base font-semibold">Price</h2>
             {snapshot ? (
               <dl className="space-y-2 text-sm text-neutral-700">
-                <Row
-                  label={`${firstNightlyRate ? formatMoney(firstNightlyRate, snapshot.currency) : "Nightly"} × ${snapshot.numNights} ${snapshot.numNights === 1 ? "night" : "nights"}`}
-                  value={formatMoney(snapshot.subtotalAccommodation.toFixed(2), snapshot.currency)}
-                />
+                {rateGroups.length > 0 ? (
+                  rateGroups.map((group, i) => (
+                    <Row
+                      key={i}
+                      label={`${formatMoney(group.rate, snapshot.currency)} × ${group.nights} ${group.nights === 1 ? "night" : "nights"}`}
+                      value={formatMoney(group.subtotal, snapshot.currency)}
+                    />
+                  ))
+                ) : (
+                  <Row
+                    label={`Nightly × ${snapshot.numNights} ${snapshot.numNights === 1 ? "night" : "nights"}`}
+                    value={formatMoney(snapshot.subtotalAccommodation.toFixed(2), snapshot.currency)}
+                  />
+                )}
                 {Number(snapshot.extraGuestFeeTotal) > 0 && (
                   <Row
                     label="Extra guests"
