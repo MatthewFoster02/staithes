@@ -20,6 +20,29 @@ function money(value: Decimal | number, currency: string): string {
   return `${symbol(currency)}${n.toFixed(0)}`;
 }
 
+// Picks a "nice" Y-axis ceiling ~15% above the biggest bar plus a
+// set of evenly spaced tick labels. The step is 1, 2, or 5 × the
+// appropriate power of ten — the same convention most hand-drawn
+// chart axes use. Returns a sensible default frame when every month
+// is zero so the chart doesn't collapse to nothing.
+function computeAxis(max: number): { ceiling: number; ticks: number[] } {
+  if (max <= 0) {
+    return { ceiling: 100, ticks: [0, 25, 50, 75, 100] };
+  }
+  const padded = max * 1.15;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(padded)));
+  const normalized = padded / magnitude;
+  let stepMultiplier: number;
+  if (normalized <= 2) stepMultiplier = 0.5;
+  else if (normalized <= 5) stepMultiplier = 1;
+  else stepMultiplier = 2;
+  const step = stepMultiplier * magnitude;
+  const ceiling = Math.ceil(padded / step) * step;
+  const numTicks = Math.round(ceiling / step);
+  const ticks = Array.from({ length: numTicks + 1 }, (_, i) => i * step);
+  return { ceiling, ticks };
+}
+
 // Returns the last 12 months (inclusive of current) as {year, month}
 // tuples with their UTC boundaries.
 function last12Months(today: Date) {
@@ -114,11 +137,13 @@ export default async function AdminFinancePage() {
     totalBookings > 0 ? totalRevenue.div(totalBookings) : new Decimal(0);
   const refundTotal = totalRefunds._sum.amount ?? new Decimal(0);
 
-  // Maximum revenue across the months — drives the bar heights.
+  // Y axis: ceiling is 15% above the biggest month rounded to a nice
+  // number, tick labels sit at 0 and every step up to ceiling.
   const maxMonthRevenue = byMonth.reduce(
     (max, m) => (m.revenue.gt(max) ? m.revenue : max),
     new Decimal(0),
   );
+  const axis = computeAxis(maxMonthRevenue.toNumber());
 
   return (
     <article className="mx-auto max-w-5xl px-6 py-10">
@@ -152,27 +177,86 @@ export default async function AdminFinancePage() {
         />
       </div>
 
-      {/* Bar chart */}
+      {/* Bar chart — Y axis on the left with tick labels, bars in a
+          flex row, subtle horizontal gridlines aligned with ticks. */}
       <section className="mb-10 rounded-2xl border border-neutral-200 bg-white p-5">
         <h2 className="mb-4 text-base font-semibold">Revenue by month</h2>
-        <div className="grid grid-cols-12 items-end gap-2 h-60">
-          {byMonth.map((m) => {
-            const height = maxMonthRevenue.gt(0)
-              ? Math.round((m.revenue.toNumber() / maxMonthRevenue.toNumber()) * 100)
-              : 0;
-            return (
-              <div key={`${m.year}-${m.month}`} className="flex flex-col items-center gap-1">
-                <div className="flex w-full flex-1 items-end">
-                  <div
-                    className="w-full rounded-t bg-emerald-500 transition hover:bg-emerald-600"
-                    style={{ height: `${height}%` }}
-                    title={`${m.label}: ${money(m.revenue, property.currency)} (${m.bookings} booking${m.bookings === 1 ? "" : "s"})`}
-                  />
-                </div>
-                <span className="text-[10px] text-neutral-500">{m.label}</span>
+        <div className="flex gap-3">
+          {/* Y axis labels — rendered top-down so the highest tick is
+              at the top of the chart. justify-between spreads them
+              evenly to match the tick positions in the chart area. */}
+          <div className="flex h-60 shrink-0 flex-col-reverse justify-between py-0 text-right text-[10px] text-neutral-500">
+            {axis.ticks.map((t) => (
+              <span key={t} className="leading-none">
+                {money(t, property.currency)}
+              </span>
+            ))}
+          </div>
+          <div className="flex-1">
+            <div className="relative h-60 border-b border-l border-neutral-200">
+              {/* Horizontal gridlines at each non-zero tick. */}
+              {axis.ticks.slice(1).map((t) => (
+                <div
+                  key={`grid-${t}`}
+                  className="pointer-events-none absolute inset-x-0 border-t border-neutral-100"
+                  style={{ bottom: `${(t / axis.ceiling) * 100}%` }}
+                />
+              ))}
+              {/* Each column is h-full and flex-col-justify-end so the
+                  bar grows upward from the bottom. Previously had
+                  items-end on the parent which only aligned columns to
+                  the bottom without stretching their height — so the
+                  inner "X%" bar was X% of the column's content height
+                  (~0), and every bar rendered at zero. */}
+              <div className="relative flex h-full gap-2">
+                {byMonth.map((m) => {
+                  const heightPct = axis.ceiling > 0
+                    ? (m.revenue.toNumber() / axis.ceiling) * 100
+                    : 0;
+                  return (
+                    <div
+                      key={`${m.year}-${m.month}`}
+                      className="group relative flex h-full flex-1 flex-col justify-end"
+                    >
+                      <div
+                        className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-neutral-900 px-2 py-1 text-xs text-white shadow-lg group-hover:block"
+                      >
+                        <span className="block font-semibold">{m.label}</span>
+                        <span className="block">
+                          {money(m.revenue, property.currency)}
+                          {m.refunds.gt(0) && (
+                            <span className="ml-1 text-red-300">
+                              − {money(m.refunds, property.currency)}
+                            </span>
+                          )}
+                        </span>
+                        <span className="block text-neutral-300">
+                          {m.bookings} booking{m.bookings === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                      <div
+                        className="w-full rounded-t bg-emerald-500 transition group-hover:bg-emerald-600"
+                        style={{
+                          height: `${heightPct > 0 ? Math.max(heightPct, 1) : 0}%`,
+                          minHeight: heightPct > 0 ? "4px" : undefined,
+                        }}
+                      />
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+            <div className="mt-1 flex gap-2">
+              {byMonth.map((m) => (
+                <span
+                  key={`label-${m.year}-${m.month}`}
+                  className="flex-1 text-center text-[10px] text-neutral-500"
+                >
+                  {m.label}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
