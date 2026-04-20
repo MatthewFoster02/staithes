@@ -21,6 +21,33 @@ const TYPE_LABELS: Record<RuleType, string> = {
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+export interface PricingRuleInitialValues {
+  id: string;
+  name: string;
+  type: RuleType;
+  priority: number;
+  dateStart: string | null;
+  dateEnd: string | null;
+  daysOfWeek: number[];
+  nightlyRate: string | null;
+  rateMultiplier: string | null;
+  minNightsForDiscount: string | null;
+  discountPercent: string | null;
+  daysBeforeCheckin: string | null;
+  daysAdvanceBooking: string | null;
+}
+
+interface PricingRuleFormProps {
+  /** When provided, the form runs in edit mode — PATCHes /[id] rather
+   *  than POSTing the create route. `type` is shown read-only because
+   *  changing a rule's type mid-flight would mean different required
+   *  fields; if you want a different type, delete and recreate. */
+  initial?: PricingRuleInitialValues;
+  /** Callback after a successful save (used by the edit page to
+   *  navigate back to the list). */
+  onSaved?: () => void;
+}
+
 // Tiny helper: re-used for labelled form rows.
 function Field({
   label,
@@ -40,20 +67,21 @@ function Field({
   );
 }
 
-export function PricingRuleForm() {
+export function PricingRuleForm({ initial, onSaved }: PricingRuleFormProps = {}) {
   const router = useRouter();
-  const [type, setType] = React.useState<RuleType>("seasonal");
-  const [name, setName] = React.useState("");
-  const [priority, setPriority] = React.useState(0);
-  const [dateStart, setDateStart] = React.useState("");
-  const [dateEnd, setDateEnd] = React.useState("");
-  const [daysOfWeek, setDaysOfWeek] = React.useState<number[]>([]);
-  const [nightlyRate, setNightlyRate] = React.useState("");
-  const [rateMultiplier, setRateMultiplier] = React.useState("");
-  const [minNightsForDiscount, setMinNights] = React.useState("");
-  const [discountPercent, setDiscountPercent] = React.useState("");
-  const [daysBeforeCheckin, setDaysBefore] = React.useState("");
-  const [daysAdvanceBooking, setDaysAhead] = React.useState("");
+  const isEdit = !!initial;
+  const [type, setType] = React.useState<RuleType>(initial?.type ?? "seasonal");
+  const [name, setName] = React.useState(initial?.name ?? "");
+  const [priority, setPriority] = React.useState(initial?.priority ?? 0);
+  const [dateStart, setDateStart] = React.useState(initial?.dateStart ?? "");
+  const [dateEnd, setDateEnd] = React.useState(initial?.dateEnd ?? "");
+  const [daysOfWeek, setDaysOfWeek] = React.useState<number[]>(initial?.daysOfWeek ?? []);
+  const [nightlyRate, setNightlyRate] = React.useState(initial?.nightlyRate ?? "");
+  const [rateMultiplier, setRateMultiplier] = React.useState(initial?.rateMultiplier ?? "");
+  const [minNightsForDiscount, setMinNights] = React.useState(initial?.minNightsForDiscount ?? "");
+  const [discountPercent, setDiscountPercent] = React.useState(initial?.discountPercent ?? "");
+  const [daysBeforeCheckin, setDaysBefore] = React.useState(initial?.daysBeforeCheckin ?? "");
+  const [daysAdvanceBooking, setDaysAhead] = React.useState(initial?.daysAdvanceBooking ?? "");
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -82,30 +110,85 @@ export function PricingRuleForm() {
     setSubmitting(true);
     setError(null);
 
-    const body: Record<string, unknown> = { name, type, priority, isActive: true };
-    if (type === "seasonal") {
-      body.dateStart = dateStart || null;
-      body.dateEnd = dateEnd || null;
-      if (nightlyRate) body.nightlyRate = Number(nightlyRate);
-      if (rateMultiplier) body.rateMultiplier = Number(rateMultiplier);
-    } else if (type === "day_of_week") {
-      body.daysOfWeek = daysOfWeek;
-      if (nightlyRate) body.nightlyRate = Number(nightlyRate);
-      if (rateMultiplier) body.rateMultiplier = Number(rateMultiplier);
-    } else if (type === "last_minute") {
-      if (daysBeforeCheckin) body.daysBeforeCheckin = Number(daysBeforeCheckin);
-      if (discountPercent) body.discountPercent = Number(discountPercent);
-    } else if (type === "early_bird") {
-      if (daysAdvanceBooking) body.daysAdvanceBooking = Number(daysAdvanceBooking);
-      if (discountPercent) body.discountPercent = Number(discountPercent);
-    } else if (type === "length_discount") {
-      if (minNightsForDiscount) body.minNightsForDiscount = Number(minNightsForDiscount);
-      if (discountPercent) body.discountPercent = Number(discountPercent);
+    // Edit mode sends every editable field (including nulls to clear
+    // previously-set ones) so the PATCH handler has a clean picture of
+    // intended state. Create mode only sends fields that are set.
+    const body: Record<string, unknown> = isEdit
+      ? {
+          name,
+          priority,
+          dateStart: type === "seasonal" ? dateStart || null : undefined,
+          dateEnd: type === "seasonal" ? dateEnd || null : undefined,
+          daysOfWeek: type === "day_of_week" ? daysOfWeek : undefined,
+          nightlyRate:
+            type === "seasonal" || type === "day_of_week"
+              ? nightlyRate
+                ? Number(nightlyRate)
+                : null
+              : undefined,
+          rateMultiplier:
+            type === "seasonal" || type === "day_of_week"
+              ? rateMultiplier
+                ? Number(rateMultiplier)
+                : null
+              : undefined,
+          minNightsForDiscount:
+            type === "length_discount"
+              ? minNightsForDiscount
+                ? Number(minNightsForDiscount)
+                : null
+              : undefined,
+          discountPercent:
+            type === "last_minute" || type === "early_bird" || type === "length_discount"
+              ? discountPercent
+                ? Number(discountPercent)
+                : null
+              : undefined,
+          daysBeforeCheckin:
+            type === "last_minute"
+              ? daysBeforeCheckin
+                ? Number(daysBeforeCheckin)
+                : null
+              : undefined,
+          daysAdvanceBooking:
+            type === "early_bird"
+              ? daysAdvanceBooking
+                ? Number(daysAdvanceBooking)
+                : null
+              : undefined,
+        }
+      : { name, type, priority, isActive: true };
+
+    if (!isEdit) {
+      if (type === "seasonal") {
+        body.dateStart = dateStart || null;
+        body.dateEnd = dateEnd || null;
+        if (nightlyRate) body.nightlyRate = Number(nightlyRate);
+        if (rateMultiplier) body.rateMultiplier = Number(rateMultiplier);
+      } else if (type === "day_of_week") {
+        body.daysOfWeek = daysOfWeek;
+        if (nightlyRate) body.nightlyRate = Number(nightlyRate);
+        if (rateMultiplier) body.rateMultiplier = Number(rateMultiplier);
+      } else if (type === "last_minute") {
+        if (daysBeforeCheckin) body.daysBeforeCheckin = Number(daysBeforeCheckin);
+        if (discountPercent) body.discountPercent = Number(discountPercent);
+      } else if (type === "early_bird") {
+        if (daysAdvanceBooking) body.daysAdvanceBooking = Number(daysAdvanceBooking);
+        if (discountPercent) body.discountPercent = Number(discountPercent);
+      } else if (type === "length_discount") {
+        if (minNightsForDiscount) body.minNightsForDiscount = Number(minNightsForDiscount);
+        if (discountPercent) body.discountPercent = Number(discountPercent);
+      }
     }
 
+    const url = isEdit
+      ? `/api/admin/pricing-rules/${initial!.id}`
+      : "/api/admin/pricing-rules";
+    const method = isEdit ? "PATCH" : "POST";
+
     try {
-      const res = await fetch("/api/admin/pricing-rules", {
-        method: "POST",
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
@@ -115,9 +198,18 @@ export function PricingRuleForm() {
         setSubmitting(false);
         return;
       }
-      resetAllFields();
-      router.refresh();
+      if (!isEdit) {
+        resetAllFields();
+        router.refresh();
+      } else {
+        // On edit success, bounce back to the list so the host sees
+        // their change reflected alongside the other rules. The
+        // refresh ensures the list shows fresh data.
+        router.push("/admin/pricing");
+        router.refresh();
+      }
       setSubmitting(false);
+      if (onSaved) onSaved();
     } catch {
       setError("Network error.");
       setSubmitting(false);
@@ -126,7 +218,9 @@ export function PricingRuleForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-neutral-200 bg-white p-5">
-      <h3 className="text-base font-semibold">New pricing rule</h3>
+      <h3 className="text-base font-semibold">
+        {isEdit ? "Edit pricing rule" : "New pricing rule"}
+      </h3>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Name" help="Internal label — shown in the list below.">
@@ -139,11 +233,15 @@ export function PricingRuleForm() {
             className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
           />
         </Field>
-        <Field label="Type">
+        <Field
+          label="Type"
+          help={isEdit ? "Type can't change — delete and recreate if you need a different one." : undefined}
+        >
           <select
             value={type}
             onChange={(e) => setType(e.target.value as RuleType)}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            disabled={isEdit}
+            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-neutral-100"
           >
             {Object.entries(TYPE_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
@@ -321,7 +419,7 @@ export function PricingRuleForm() {
 
       <div className="flex justify-end">
         <Button type="submit" disabled={submitting}>
-          {submitting ? "Saving…" : "Add rule"}
+          {submitting ? "Saving…" : isEdit ? "Save changes" : "Add rule"}
         </Button>
       </div>
     </form>

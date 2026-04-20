@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
@@ -60,6 +61,12 @@ export function PricingRuleRow({ rule }: { rule: PricingRuleRowData }) {
         <p className="mt-0.5 text-xs text-neutral-500">Priority: {rule.priority}</p>
       </div>
       <div className="flex gap-2">
+        <Link
+          href={`/admin/pricing/${rule.id}`}
+          className="inline-flex h-8 items-center rounded-md border border-neutral-300 px-3 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+        >
+          Edit
+        </Link>
         <Button variant="outline" size="sm" onClick={toggleActive} disabled={busy}>
           {rule.isActive ? "Disable" : "Enable"}
         </Button>
