@@ -12,8 +12,12 @@ import { propertyPhotoUrl } from "@/lib/storage/photos";
 import { BookingReviewForm } from "@/components/booking/review-form";
 import { groupNightlyRates } from "@/lib/pricing/display";
 
+// /book is transactional and every query-string variant would become
+// its own indexable URL — noindex keeps the index clean and stops
+// thin duplicate pages from crowding out the property page.
 export const metadata: Metadata = {
   title: "Review your booking",
+  robots: { index: false, follow: true },
 };
 
 const QuerySchema = z.object({

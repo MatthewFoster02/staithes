@@ -4,6 +4,7 @@ import { safeNext } from "@/lib/auth/safe-redirect";
 
 export const metadata: Metadata = {
   title: "Sign in",
+  robots: { index: false, follow: true },
 };
 
 export default async function LoginPage({

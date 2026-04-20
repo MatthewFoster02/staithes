@@ -14,6 +14,12 @@ import { PropertyReviews } from "@/components/reviews/property-reviews";
 import { getCurrentUser } from "@/lib/auth/server";
 import { propertyPhotoUrl } from "@/lib/storage/photos";
 import { siteUrl } from "@/lib/seo/site";
+import {
+  organisationLd,
+  propertyLd,
+  websiteLd,
+} from "@/lib/seo/json-ld";
+import { JsonLd } from "@/components/seo/json-ld";
 
 export async function generateMetadata(): Promise<Metadata> {
   const [property, siteConfig] = await Promise.all([
@@ -68,7 +74,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HomePage() {
-  const [property, user] = await Promise.all([
+  const [property, user, siteConfig] = await Promise.all([
     prisma.property.findFirst({
       include: {
         photos: { orderBy: { sortOrder: "asc" } },
@@ -79,6 +85,7 @@ export default async function HomePage() {
       },
     }),
     getCurrentUser(),
+    prisma.siteConfiguration.findFirst(),
   ]);
 
   // Reviews lookups happen in parallel with the rest of the page in
@@ -138,8 +145,53 @@ export default async function HomePage() {
     category: pa.amenity.category,
   }));
 
+  const siteName = siteConfig?.siteName ?? property.name;
+  const ldPayloads: unknown[] = [websiteLd(siteName)];
+  if (siteConfig?.contactEmail) {
+    ldPayloads.push(
+      organisationLd({
+        siteName,
+        logoUrl: siteConfig.logoUrl ?? null,
+        contactEmail: siteConfig.contactEmail,
+        contactPhone: siteConfig.contactPhone ?? null,
+      }),
+    );
+  }
+  ldPayloads.push(
+    propertyLd(
+      {
+        name: property.name,
+        description: property.shortDescription ?? property.description,
+        propertyType: property.propertyType,
+        addressApprox: property.addressApprox,
+        latitude: Number(property.latitude),
+        longitude: Number(property.longitude),
+        maxGuests: property.maxGuests,
+        bedrooms: property.bedrooms,
+        beds: property.beds,
+        bathrooms: Number(property.bathrooms),
+        baseNightlyRate: property.baseNightlyRate.toFixed(2),
+        currency: property.currency,
+        imageUrls: property.photos.slice(0, 6).map((p) => propertyPhotoUrl(p.url)),
+      },
+      reviewAverage !== null && reviewCount > 0
+        ? { averageOverall: reviewAverage, count: reviewCount }
+        : null,
+      reviewRows
+        .filter((r): r is typeof r & { reviewText: string } => !!r.reviewText)
+        .map((r) => ({
+          id: r.id,
+          guestDisplayName: `${r.guestFirstName} ${r.guestLastInitial}.`,
+          ratingOverall: r.ratingOverall,
+          reviewText: r.reviewText,
+          createdISO: r.createdAt.toISOString(),
+        })),
+    ),
+  );
+
   return (
     <article className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+      <JsonLd payload={ldPayloads} id="home" />
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">

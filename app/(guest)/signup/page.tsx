@@ -4,6 +4,7 @@ import { safeNext } from "@/lib/auth/safe-redirect";
 
 export const metadata: Metadata = {
   title: "Create an account",
+  robots: { index: false, follow: true },
 };
 
 export default async function SignUpPage({
