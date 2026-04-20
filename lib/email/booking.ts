@@ -1,5 +1,6 @@
 import { resend, senderEmail } from "@/lib/email/client";
 import { BookingConfirmationEmail } from "@/lib/email/templates/booking-confirmation";
+import { BookingCancelledEmail } from "@/lib/email/templates/booking-cancelled";
 import { formatISODate, differenceInDays } from "@/lib/availability/dates";
 
 interface SendBookingConfirmationArgs {
@@ -54,5 +55,53 @@ export async function sendBookingConfirmationEmail(
       `[email] failed to send booking confirmation to ${args.guestEmail}:`,
       err,
     );
+  }
+}
+
+interface SendBookingCancelledArgs {
+  bookingId: string;
+  guestEmail: string;
+  guestFirstName: string;
+  propertyName: string;
+  checkIn: Date;
+  checkOut: Date;
+  canceller: "guest" | "host" | "system";
+  refundAmount: string;
+  refundReason: string;
+  currency: string;
+  reason?: string;
+}
+
+// Cancellation email — sent to the guest regardless of who initiated
+// the cancel. Same don't-throw-on-failure pattern as the confirmation
+// email.
+export async function sendBookingCancelledEmail(
+  args: SendBookingCancelledArgs,
+): Promise<void> {
+  try {
+    const { error } = await resend.emails.send({
+      from: senderEmail(),
+      to: args.guestEmail,
+      subject: `Your booking at ${args.propertyName} is cancelled`,
+      react: BookingCancelledEmail({
+        guestFirstName: args.guestFirstName,
+        propertyName: args.propertyName,
+        checkInISO: formatISODate(args.checkIn),
+        checkOutISO: formatISODate(args.checkOut),
+        canceller: args.canceller,
+        refundAmount: args.refundAmount,
+        refundReason: args.refundReason,
+        currency: args.currency,
+        reason: args.reason,
+        bookingReference: args.bookingId.slice(0, 8).toUpperCase(),
+      }),
+    });
+    if (error) {
+      console.error(`[email] Resend rejected cancellation for ${args.guestEmail}:`, error);
+      return;
+    }
+    console.log(`[email] sent cancellation to ${args.guestEmail} (${args.bookingId})`);
+  } catch (err) {
+    console.error(`[email] failed to send cancellation to ${args.guestEmail}:`, err);
   }
 }

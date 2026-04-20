@@ -8,10 +8,12 @@ import { getCurrentUser } from "@/lib/auth/server";
 import { propertyPhotoUrl } from "@/lib/storage/photos";
 import { differenceInDays, formatISODate } from "@/lib/availability/dates";
 import { BookingStatusBadge } from "@/components/booking/status-badge";
+import { CancelBookingButton } from "@/components/booking/cancel-booking-button";
 import { ReviewForm } from "@/components/reviews/review-form";
 import { todayUTC } from "@/lib/availability/dates";
 import { groupNightlyRates } from "@/lib/pricing/display";
-import type { Prisma } from "@/lib/generated/prisma/client";
+import { previewRefund } from "@/lib/booking/cancel";
+import type { CancellationPolicy, Prisma } from "@/lib/generated/prisma/client";
 
 export const metadata: Metadata = {
   title: "Booking details",
@@ -83,6 +85,20 @@ export default async function BookingDetailPage({ params }: PageProps) {
     !booking.review &&
     (booking.status === "confirmed" || booking.status === "completed") &&
     booking.checkOut <= todayUTC();
+
+  // Cancellable when the stay hasn't happened yet and the booking is
+  // still live.
+  const eligibleForCancel =
+    (booking.status === "pending" || booking.status === "confirmed") &&
+    booking.checkOut > todayUTC();
+  const refundPreview = eligibleForCancel
+    ? previewRefund(
+        booking.totalPrice,
+        ((booking.cancellationPolicySnapshot as Prisma.JsonObject)?.policy as CancellationPolicy) ??
+          "moderate",
+        Math.max(0, differenceInDays(booking.checkIn, todayUTC())),
+      )
+    : null;
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -191,6 +207,27 @@ export default async function BookingDetailPage({ params }: PageProps) {
                   &ldquo;{booking.review.reviewText}&rdquo;
                 </p>
               )}
+            </section>
+          )}
+
+          {eligibleForCancel && refundPreview && (
+            <section className="rounded-2xl border border-neutral-200 p-5">
+              <h2 className="mb-2 text-base font-semibold">Cancel</h2>
+              <p className="mb-3 text-sm text-neutral-600">
+                Based on the cancellation policy you agreed to, you&rsquo;d be
+                refunded{" "}
+                <strong>
+                  {booking.currency === "GBP" ? "£" : `${booking.currency} `}
+                  {refundPreview.amount}
+                </strong>{" "}
+                ({refundPreview.reason}).
+              </p>
+              <CancelBookingButton
+                bookingId={booking.id}
+                canceller="guest"
+                expectedRefundDisplay={`${booking.currency === "GBP" ? "£" : `${booking.currency} `}${refundPreview.amount}`}
+                expectedRefundReason={refundPreview.reason}
+              />
             </section>
           )}
 
