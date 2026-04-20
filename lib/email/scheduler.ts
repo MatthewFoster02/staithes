@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import { Prisma } from "@/lib/generated/prisma/client";
 import type { AutomatedEmailType } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { resend, senderEmail } from "@/lib/email/client";
+import { resend, resolveSenderFrom } from "@/lib/email/client";
 import { addDays, formatISODate, todayUTC } from "@/lib/availability/dates";
 import { siteUrl } from "@/lib/seo/site";
 import { PreArrivalEmail } from "@/lib/email/templates/pre-arrival";
@@ -212,7 +212,7 @@ async function sendAndLog(args: {
 
   try {
     const { error } = await resend.emails.send({
-      from: senderEmail(),
+      from: await resolveSenderFrom(),
       to: args.guestEmail,
       subject: args.subject,
       react: args.react,

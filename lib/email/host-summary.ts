@@ -1,6 +1,6 @@
 import { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { resend, senderEmail } from "@/lib/email/client";
+import { resend, resolveSenderFrom } from "@/lib/email/client";
 import { addDays, formatISODate, todayUTC } from "@/lib/availability/dates";
 import { getHostEmails } from "@/lib/auth/host";
 import {
@@ -123,7 +123,7 @@ export async function sendDailyHostSummary(
   for (const recipient of hostEmails) {
     try {
       const { error } = await resend.emails.send({
-        from: senderEmail(),
+        from: await resolveSenderFrom(),
         to: recipient,
         subject: `Daily summary — ${property.name}`,
         react: HostDailySummaryEmail({

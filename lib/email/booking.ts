@@ -1,4 +1,4 @@
-import { resend, senderEmail } from "@/lib/email/client";
+import { resend, resolveSenderFrom } from "@/lib/email/client";
 import { BookingConfirmationEmail } from "@/lib/email/templates/booking-confirmation";
 import { BookingCancelledEmail } from "@/lib/email/templates/booking-cancelled";
 import { RequestApprovedEmail } from "@/lib/email/templates/request-approved";
@@ -29,7 +29,7 @@ export async function sendBookingConfirmationEmail(
 
   try {
     const { error } = await resend.emails.send({
-      from: senderEmail(),
+      from: await resolveSenderFrom(),
       to: args.guestEmail,
       subject: `Your booking at ${args.propertyName} is confirmed`,
       react: BookingConfirmationEmail({
@@ -81,7 +81,7 @@ export async function sendBookingCancelledEmail(
 ): Promise<void> {
   try {
     const { error } = await resend.emails.send({
-      from: senderEmail(),
+      from: await resolveSenderFrom(),
       to: args.guestEmail,
       subject: `Your booking at ${args.propertyName} is cancelled`,
       react: BookingCancelledEmail({
@@ -127,7 +127,7 @@ export async function sendBookingRequestApprovedEmail(
 ): Promise<void> {
   try {
     const { error } = await resend.emails.send({
-      from: senderEmail(),
+      from: await resolveSenderFrom(),
       to: args.guestEmail,
       subject: `Your request at ${args.propertyName} is approved — complete payment`,
       react: RequestApprovedEmail({
