@@ -201,7 +201,13 @@ export default async function AdminDashboardPage() {
                 primary={`${b.guest.firstName} ${b.guest.lastName}`}
                 secondary={`${formatDateShort(b.checkIn)} → ${formatDateShort(b.checkOut)}`}
                 meta={formatMoney(b.totalPrice, b.currency)}
-                badge={<BookingStatusBadge status={b.status} />}
+                badge={
+                  <BookingStatusBadge
+                    status={b.status}
+                    bookingType={b.bookingType}
+                    approvedAt={b.approvedAt}
+                  />
+                }
               />
             ))}
         </ListSection>
@@ -215,7 +221,13 @@ export default async function AdminDashboardPage() {
                 primary={`${b.guest.firstName} ${b.guest.lastName}`}
                 secondary={`Created ${formatDateShort(b.createdAt)} · ${formatDateShort(b.checkIn)} → ${formatDateShort(b.checkOut)}`}
                 meta={formatMoney(b.totalPrice, b.currency)}
-                badge={<BookingStatusBadge status={b.status} />}
+                badge={
+                  <BookingStatusBadge
+                    status={b.status}
+                    bookingType={b.bookingType}
+                    approvedAt={b.approvedAt}
+                  />
+                }
               />
             ))}
         </ListSection>

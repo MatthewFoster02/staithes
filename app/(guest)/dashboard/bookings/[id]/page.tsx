@@ -12,8 +12,8 @@ import { CancelBookingButton } from "@/components/booking/cancel-booking-button"
 import { ReviewForm } from "@/components/reviews/review-form";
 import { todayUTC } from "@/lib/availability/dates";
 import { groupNightlyRates } from "@/lib/pricing/display";
-import { previewRefund } from "@/lib/booking/cancel";
-import type { CancellationPolicy, Prisma } from "@/lib/generated/prisma/client";
+import { canCancel, previewRefund } from "@/lib/booking/cancel";
+import type { Prisma } from "@/lib/generated/prisma/client";
 
 export const metadata: Metadata = {
   title: "Booking details",
@@ -86,19 +86,8 @@ export default async function BookingDetailPage({ params }: PageProps) {
     (booking.status === "confirmed" || booking.status === "completed") &&
     booking.checkOut <= todayUTC();
 
-  // Cancellable when the stay hasn't happened yet and the booking is
-  // still live.
-  const eligibleForCancel =
-    (booking.status === "pending" || booking.status === "confirmed") &&
-    booking.checkOut > todayUTC();
-  const refundPreview = eligibleForCancel
-    ? previewRefund(
-        booking.totalPrice,
-        ((booking.cancellationPolicySnapshot as Prisma.JsonObject)?.policy as CancellationPolicy) ??
-          "moderate",
-        Math.max(0, differenceInDays(booking.checkIn, todayUTC())),
-      )
-    : null;
+  const eligibleForCancel = canCancel(booking, "guest");
+  const refundPreview = eligibleForCancel ? previewRefund(booking, "guest") : null;
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -119,7 +108,11 @@ export default async function BookingDetailPage({ params }: PageProps) {
             Booking reference: {booking.id.slice(0, 8).toUpperCase()}
           </p>
         </div>
-        <BookingStatusBadge status={booking.status} />
+        <BookingStatusBadge
+          status={booking.status}
+          bookingType={booking.bookingType}
+          approvedAt={booking.approvedAt}
+        />
       </header>
 
       <div className="grid gap-6 md:grid-cols-[2fr_1fr]">

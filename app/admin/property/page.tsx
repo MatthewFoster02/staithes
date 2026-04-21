@@ -60,7 +60,7 @@ export default async function AdminPropertyPage() {
   }));
 
   return (
-    <article className="mx-auto max-w-4xl px-6 py-10">
+    <article className="mx-auto max-w-4xl px-6 py-10 pb-28">
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Property</h1>
         <p className="mt-1 text-sm text-neutral-600">

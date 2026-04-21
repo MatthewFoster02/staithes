@@ -48,17 +48,25 @@ function Field({
   help,
   children,
   span = 1,
+  tone = "neutral",
 }: {
   label: string;
   help?: string;
   children: React.ReactNode;
   span?: 1 | 2;
+  tone?: "neutral" | "error";
 }) {
   return (
     <label className={`block space-y-1 ${span === 2 ? "sm:col-span-2" : ""}`}>
       <span className="text-sm font-medium text-neutral-700">{label}</span>
       {children}
-      {help && <span className="block text-xs text-neutral-500">{help}</span>}
+      {help && (
+        <span
+          className={`block text-xs ${tone === "error" ? "text-red-600" : "text-neutral-500"}`}
+        >
+          {help}
+        </span>
+      )}
     </label>
   );
 }
@@ -144,14 +152,23 @@ export function PropertyEditForm({ initial }: { initial: PropertyEditValues }) {
             className={inputClass}
           />
         </Field>
-        <Field label="Slug" help="Used in URLs. Lowercase letters, numbers, hyphens.">
+        <Field
+          label="Slug"
+          tone={values.slug.length > 0 && !/^[a-z0-9-]+$/.test(values.slug) ? "error" : "neutral"}
+          help={
+            values.slug.length > 0 && !/^[a-z0-9-]+$/.test(values.slug)
+              ? "Only lowercase letters, numbers, and hyphens are allowed."
+              : "Used in URLs. Lowercase letters, numbers, hyphens."
+          }
+        >
           <input
             type="text"
             value={values.slug}
             onChange={(e) => update("slug", e.target.value)}
             required
             pattern="[a-z0-9-]+"
-            className={inputClass}
+            aria-invalid={values.slug.length > 0 && !/^[a-z0-9-]+$/.test(values.slug)}
+            className={`${inputClass} aria-invalid:border-red-500 aria-invalid:ring-1 aria-invalid:ring-red-300`}
           />
         </Field>
         <Field label="Short description" help="Shown on search snippets and OG cards." span={2}>
@@ -401,15 +418,21 @@ export function PropertyEditForm({ initial }: { initial: PropertyEditValues }) {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="sticky bottom-4 z-10 flex items-center justify-end gap-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-        {savedAt && (
-          <span className="text-xs text-emerald-700">
-            Saved {savedAt.toLocaleTimeString("en-GB")}
-          </span>
-        )}
-        <Button type="submit" disabled={submitting}>
-          {submitting ? "Saving…" : "Save changes"}
-        </Button>
+      {/* Floats at the bottom of the viewport so the host can save
+          changes without scrolling back from the photo manager. The
+          parent page adds bottom padding to stop content disappearing
+          behind it. */}
+      <div className="pointer-events-none fixed bottom-4 left-0 right-0 z-30 px-6">
+        <div className="pointer-events-auto mx-auto flex max-w-4xl items-center justify-end gap-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-lg">
+          {savedAt && (
+            <span className="text-xs text-emerald-700">
+              Saved {savedAt.toLocaleTimeString("en-GB")}
+            </span>
+          )}
+          <Button type="submit" disabled={submitting}>
+            {submitting ? "Saving…" : "Save changes"}
+          </Button>
+        </div>
       </div>
     </form>
   );

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/server";
 import { differenceInDays, formatISODate, todayUTC } from "@/lib/availability/dates";
 import { BookingCard } from "@/components/booking/booking-card";
-import type { BookingStatus } from "@/lib/generated/prisma/client";
+import type { BookingStatus, BookingType } from "@/lib/generated/prisma/client";
 
 export const metadata: Metadata = {
   title: "My bookings",
@@ -28,6 +28,8 @@ interface BookingRow {
   totalPrice: string;
   currency: string;
   status: BookingStatus;
+  bookingType: BookingType;
+  approvedAt: Date | null;
 }
 
 export default async function DashboardPage() {
@@ -66,6 +68,8 @@ export default async function DashboardPage() {
       totalPrice: b.totalPrice.toFixed(2),
       currency: b.currency,
       status: b.status,
+      bookingType: b.bookingType,
+      approvedAt: b.approvedAt,
     };
 
     if (b.status === "cancelled") sections.cancelled.push(row);
@@ -132,6 +136,8 @@ function Section({ title, rows }: { title: string; rows: BookingRow[] }) {
               totalPrice={row.totalPrice}
               currency={row.currency}
               status={row.status}
+              bookingType={row.bookingType}
+              approvedAt={row.approvedAt}
               href={`/dashboard/bookings/${row.id}`}
             />
           </li>

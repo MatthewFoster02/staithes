@@ -10,9 +10,8 @@ import { BookingStatusBadge } from "@/components/booking/status-badge";
 import { CancelBookingButton } from "@/components/booking/cancel-booking-button";
 import { RequestApprovalButtons } from "@/components/admin/request-approval-buttons";
 import { groupNightlyRates } from "@/lib/pricing/display";
-import { previewRefund } from "@/lib/booking/cancel";
-import { todayUTC } from "@/lib/availability/dates";
-import type { CancellationPolicy, Prisma } from "@/lib/generated/prisma/client";
+import { canCancel, previewRefund } from "@/lib/booking/cancel";
+import type { Prisma } from "@/lib/generated/prisma/client";
 
 export const metadata: Metadata = {
   title: "Admin · Booking detail",
@@ -82,17 +81,8 @@ export default async function AdminBookingDetailPage({ params }: PageProps) {
     (snapshot?.nightlyRates as Prisma.JsonValue as NightlyRate[] | null) ?? null;
   const rateGroups = nightlyRates ? groupNightlyRates(nightlyRates) : [];
 
-  const eligibleForCancel =
-    (booking.status === "pending" || booking.status === "confirmed") &&
-    booking.checkOut > todayUTC();
-  const refundPreview = eligibleForCancel
-    ? previewRefund(
-        booking.totalPrice,
-        ((booking.cancellationPolicySnapshot as Prisma.JsonObject)?.policy as CancellationPolicy) ??
-          "moderate",
-        Math.max(0, differenceInDays(booking.checkIn, todayUTC())),
-      )
-    : null;
+  const eligibleForCancel = canCancel(booking, "host");
+  const refundPreview = eligibleForCancel ? previewRefund(booking, "host") : null;
 
   return (
     <article className="mx-auto max-w-5xl px-6 py-10">
@@ -114,7 +104,11 @@ export default async function AdminBookingDetailPage({ params }: PageProps) {
             {formatDateTime(booking.createdAt)}
           </p>
         </div>
-        <BookingStatusBadge status={booking.status} />
+        <BookingStatusBadge
+          status={booking.status}
+          bookingType={booking.bookingType}
+          approvedAt={booking.approvedAt}
+        />
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">

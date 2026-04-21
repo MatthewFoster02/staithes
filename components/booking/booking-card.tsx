@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { BookingStatus } from "@/lib/generated/prisma/client";
+import type { BookingStatus, BookingType } from "@/lib/generated/prisma/client";
 import { BookingStatusBadge } from "@/components/booking/status-badge";
 
 export interface BookingCardProps {
@@ -11,6 +11,8 @@ export interface BookingCardProps {
   totalPrice: string; // decimal string
   currency: string;
   status: BookingStatus;
+  bookingType: BookingType;
+  approvedAt: Date | null;
   href: string;
 }
 
@@ -38,6 +40,8 @@ export function BookingCard({
   totalPrice,
   currency,
   status,
+  bookingType,
+  approvedAt,
   href,
 }: BookingCardProps) {
   return (
@@ -56,7 +60,11 @@ export function BookingCard({
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <BookingStatusBadge status={status} />
+          <BookingStatusBadge
+            status={status}
+            bookingType={bookingType}
+            approvedAt={approvedAt}
+          />
           <p className="text-base font-semibold text-neutral-900">
             {formatMoney(totalPrice, currency)}
           </p>

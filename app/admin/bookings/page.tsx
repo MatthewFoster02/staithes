@@ -183,7 +183,11 @@ export default async function AdminBookingsPage({ searchParams }: PageProps) {
                       </p>
                     </td>
                     <td className="px-4 py-3">
-                      <BookingStatusBadge status={b.status} />
+                      <BookingStatusBadge
+                        status={b.status}
+                        bookingType={b.bookingType}
+                        approvedAt={b.approvedAt}
+                      />
                     </td>
                     <td className="px-4 py-3 text-right font-medium text-neutral-900">
                       {formatMoney(b.totalPrice.toFixed(2), b.currency)}
