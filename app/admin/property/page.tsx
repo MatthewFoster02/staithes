@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { propertyPhotoUrl, propertyThumbnailUrl } from "@/lib/storage/photos";
-import { PropertyEditForm, type PropertyEditValues } from "@/components/admin/property-edit-form";
+import {
+  PropertyEditForm,
+  type PropertyEditValues,
+  type RefundTierRow,
+} from "@/components/admin/property-edit-form";
+import type { Prisma } from "@/lib/generated/prisma/client";
 import {
   PropertyPhotoManager,
   type PropertyPhotoItem,
@@ -11,6 +16,26 @@ import {
 export const metadata: Metadata = {
   title: "Admin · Property",
 };
+
+function parseTiers(raw: Prisma.JsonValue): RefundTierRow[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RefundTierRow[] = [];
+  for (const row of raw) {
+    if (
+      row &&
+      typeof row === "object" &&
+      !Array.isArray(row) &&
+      typeof (row as Prisma.JsonObject).minDays === "number" &&
+      typeof (row as Prisma.JsonObject).percent === "number"
+    ) {
+      out.push({
+        minDays: (row as Prisma.JsonObject).minDays as number,
+        percent: (row as Prisma.JsonObject).percent as number,
+      });
+    }
+  }
+  return out;
+}
 
 export default async function AdminPropertyPage() {
   const property = await prisma.property.findFirst({
@@ -45,6 +70,7 @@ export default async function AdminPropertyPage() {
     currency: property.currency,
     houseRules: property.houseRules ?? "",
     cancellationPolicy: property.cancellationPolicy,
+    cancellationTiers: parseTiers(property.cancellationTiers),
     status: property.status,
     instantBookingEnabled: property.instantBookingEnabled,
   };

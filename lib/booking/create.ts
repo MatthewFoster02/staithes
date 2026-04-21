@@ -88,6 +88,7 @@ export async function createBooking(args: CreateBookingArgs): Promise<CreateBook
         where: { id: propertyId },
         select: {
           cancellationPolicy: true,
+          cancellationTiers: true,
           checkInTime: true,
           checkOutTime: true,
           name: true,
@@ -109,6 +110,7 @@ export async function createBooking(args: CreateBookingArgs): Promise<CreateBook
           currency: breakdown.currency,
           cancellationPolicySnapshot: {
             policy: property.cancellationPolicy,
+            tiers: property.cancellationTiers as Prisma.JsonArray,
             checkInTime: property.checkInTime,
             checkOutTime: property.checkOutTime,
             capturedAt: new Date().toISOString(),

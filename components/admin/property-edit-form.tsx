@@ -4,6 +4,11 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
+export interface RefundTierRow {
+  minDays: number;
+  percent: number;
+}
+
 export interface PropertyEditValues {
   name: string;
   slug: string;
@@ -29,9 +34,25 @@ export interface PropertyEditValues {
   currency: string;
   houseRules: string;
   cancellationPolicy: string;
+  cancellationTiers: RefundTierRow[];
   status: string;
   instantBookingEnabled: boolean;
 }
+
+// Preset tiers by policy name. Mirrors lib/booking/cancel.ts
+// PRESET_TIERS — duplicated in the client bundle so the preset
+// buttons don't need a round-trip.
+const PRESET_TIERS: Record<string, RefundTierRow[]> = {
+  flexible: [{ minDays: 1, percent: 100 }],
+  moderate: [
+    { minDays: 5, percent: 100 },
+    { minDays: 3, percent: 50 },
+  ],
+  strict: [
+    { minDays: 14, percent: 100 },
+    { minDays: 7, percent: 50 },
+  ],
+};
 
 // Section primitive used across the form for consistent spacing.
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -72,6 +93,10 @@ function Field({
 }
 
 const inputClass = "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm";
+
+function sortTiers(tiers: RefundTierRow[]): RefundTierRow[] {
+  return [...tiers].sort((a, b) => b.minDays - a.minDays);
+}
 
 export function PropertyEditForm({ initial }: { initial: PropertyEditValues }) {
   const router = useRouter();
@@ -115,6 +140,7 @@ export function PropertyEditForm({ initial }: { initial: PropertyEditValues }) {
       currency: values.currency,
       houseRules: values.houseRules || null,
       cancellationPolicy: values.cancellationPolicy,
+      cancellationTiers: sortTiers(values.cancellationTiers),
       status: values.status,
       instantBookingEnabled: values.instantBookingEnabled,
     };
@@ -343,15 +369,15 @@ export function PropertyEditForm({ initial }: { initial: PropertyEditValues }) {
             className={inputClass}
           />
         </Field>
-        <Field label="Cancellation policy">
+        <Field label="Cancellation policy label">
           <select
             value={values.cancellationPolicy}
             onChange={(e) => update("cancellationPolicy", e.target.value)}
             className={inputClass}
           >
-            <option value="flexible">Flexible (full refund up to 24h)</option>
-            <option value="moderate">Moderate (full refund up to 5 days)</option>
-            <option value="strict">Strict (full refund up to 14 days)</option>
+            <option value="flexible">Flexible</option>
+            <option value="moderate">Moderate</option>
+            <option value="strict">Strict</option>
           </select>
         </Field>
         <Field label="Booking mode" help="Instant = pay immediately; Request = guest requests and waits for host approval.">
@@ -373,6 +399,11 @@ export function PropertyEditForm({ initial }: { initial: PropertyEditValues }) {
           />
         </Field>
       </Section>
+
+      <RefundTiersEditor
+        tiers={values.cancellationTiers}
+        onChange={(next) => update("cancellationTiers", next)}
+      />
 
       <Section title="Pricing">
         <Field label="Base nightly rate">
@@ -435,5 +466,127 @@ export function PropertyEditForm({ initial }: { initial: PropertyEditValues }) {
         </div>
       </div>
     </form>
+  );
+}
+
+function RefundTiersEditor({
+  tiers,
+  onChange,
+}: {
+  tiers: RefundTierRow[];
+  onChange: (next: RefundTierRow[]) => void;
+}) {
+  // Tiers render sorted by minDays descending so the admin reads them
+  // like "14 days: 100%, 7 days: 50%" — the order refundRules actually
+  // evaluate in. Edits mutate by index in the sorted view.
+  const sorted = sortTiers(tiers);
+
+  function updateRow(index: number, patch: Partial<RefundTierRow>) {
+    const next = sorted.map((row, i) => (i === index ? { ...row, ...patch } : row));
+    onChange(next);
+  }
+  function removeRow(index: number) {
+    onChange(sorted.filter((_, i) => i !== index));
+  }
+  function addRow() {
+    onChange([...sorted, { minDays: 0, percent: 0 }]);
+  }
+  function applyPreset(policy: keyof typeof PRESET_TIERS) {
+    onChange(PRESET_TIERS[policy].map((t) => ({ ...t })));
+  }
+
+  return (
+    <section className="rounded-2xl border border-neutral-200 bg-white p-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-base font-semibold">Cancellation refund tiers</h2>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-neutral-500">Preset:</span>
+          <button
+            type="button"
+            onClick={() => applyPreset("flexible")}
+            className="rounded-md border border-neutral-300 bg-white px-2 py-1 font-medium hover:bg-neutral-50"
+          >
+            Flexible
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset("moderate")}
+            className="rounded-md border border-neutral-300 bg-white px-2 py-1 font-medium hover:bg-neutral-50"
+          >
+            Moderate
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset("strict")}
+            className="rounded-md border border-neutral-300 bg-white px-2 py-1 font-medium hover:bg-neutral-50"
+          >
+            Strict
+          </button>
+        </div>
+      </div>
+      <p className="mb-4 text-xs text-neutral-500">
+        The first tier whose notice period is met wins — so list generous
+        tiers first (more days). Below the last tier, no refund is given.
+        Changes here only affect <em>new</em> bookings — existing bookings
+        keep the tiers they were made under.
+      </p>
+
+      {sorted.length === 0 ? (
+        <p className="rounded-md border border-dashed border-neutral-300 p-4 text-center text-sm text-neutral-500">
+          No refund tiers — every cancellation is non-refundable. Add a
+          row below or apply a preset.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          <li className="flex items-center gap-3 px-2 text-xs uppercase tracking-wide text-neutral-500">
+            <span className="w-32">Notice (days)</span>
+            <span className="w-32">Refund (%)</span>
+            <span className="flex-1">Effect</span>
+            <span className="w-20" />
+          </li>
+          {sorted.map((tier, i) => (
+            <li key={i} className="flex items-center gap-3 rounded-md border border-neutral-200 p-2">
+              <input
+                type="number"
+                min={0}
+                max={365}
+                value={tier.minDays}
+                onChange={(e) => updateRow(i, { minDays: Number(e.target.value) })}
+                className="w-32 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+              />
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={tier.percent}
+                onChange={(e) => updateRow(i, { percent: Number(e.target.value) })}
+                className="w-32 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+              />
+              <span className="flex-1 text-sm text-neutral-600">
+                {tier.percent}% refund for cancellations with at least {tier.minDays}{" "}
+                {tier.minDays === 1 ? "day" : "days"} notice
+              </span>
+              <button
+                type="button"
+                onClick={() => removeRow(i)}
+                className="w-20 rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs font-medium text-red-600 hover:bg-neutral-50"
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={addRow}
+          className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-neutral-50"
+        >
+          + Add tier
+        </button>
+      </div>
+    </section>
   );
 }

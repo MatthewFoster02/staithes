@@ -44,6 +44,15 @@ const PatchSchema = z.object({
   currency: z.string().length(3).optional(),
   houseRules: z.string().nullable().optional(),
   cancellationPolicy: z.enum(["flexible", "moderate", "strict"]).optional(),
+  cancellationTiers: z
+    .array(
+      z.object({
+        minDays: z.coerce.number().int().min(0).max(365),
+        percent: z.coerce.number().int().min(0).max(100),
+      }),
+    )
+    .max(20)
+    .optional(),
   status: z.enum(["active", "paused", "hidden"]).optional(),
   instantBookingEnabled: z.boolean().optional(),
 });

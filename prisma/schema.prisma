@@ -151,6 +151,10 @@ model Property {
   currency           String             @default("GBP") @db.Char(3)
   houseRules             String?            @map("house_rules")
   cancellationPolicy     CancellationPolicy @default(moderate) @map("cancellation_policy")
+  // Ordered list of {minDays, percent} refund tiers. Snapshotted onto
+  // each booking so policy changes don't retroactively alter terms.
+  // The enum above remains as a label / preset picker for the admin UI.
+  cancellationTiers      Json               @default("[]") @map("cancellation_tiers")
   status                 PropertyStatus     @default(active)
   // When true, guests pay immediately on the booking flow. When
   // false, booking creation puts the reservation in request state
