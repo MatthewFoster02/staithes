@@ -13,6 +13,7 @@ const BodySchema = z.object({
   adults: z.number().int().min(1).max(20),
   children: z.number().int().min(0).max(20).optional(),
   guestMessage: z.string().max(1000).optional(),
+  marketingOptIn: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -45,6 +46,23 @@ export async function POST(request: Request) {
   }
   if (!property) {
     return NextResponse.json({ error: "No property configured" }, { status: 404 });
+  }
+
+  // 4a. Persist marketing opt-in alongside the booking. Done before
+  // createBooking so a Stripe failure doesn't lose the consent — we
+  // re-record on every booking, so a guest who originally opted out
+  // can opt in next time without us touching the existing flag.
+  if (parsed.data.marketingOptIn === true && !guest.marketingOptIn) {
+    await prisma.guest.update({
+      where: { id: guest.id },
+      data: {
+        marketingOptIn: true,
+        marketingOptInAt: new Date(),
+        // Lazy-allocate the unsubscribe token on first opt-in.
+        unsubscribeToken:
+          guest.unsubscribeToken ?? crypto.randomUUID().replace(/-/g, ""),
+      },
+    });
   }
 
   // 4. Create booking + Stripe session

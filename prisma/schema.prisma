@@ -229,6 +229,14 @@ model Guest {
   preferredLanguage String?   @map("preferred_language")
   isVerified        Boolean   @default(false) @map("is_verified")
   notesInternal     String?   @map("notes_internal")
+  // Explicit GDPR opt-in. Always defaults to false — never pre-checked
+  // anywhere in the booking flow. `marketingOptInAt` is the timestamp
+  // of the last positive consent for audit purposes.
+  marketingOptIn    Boolean   @default(false) @map("marketing_opt_in")
+  marketingOptInAt  DateTime? @map("marketing_opt_in_at")
+  // Random per-guest token used for one-click unsubscribe links in
+  // marketing emails. Lazy-allocated when a guest first opts in.
+  unsubscribeToken  String?   @unique @map("unsubscribe_token")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   lastLoginAt       DateTime? @map("last_login_at")
@@ -239,6 +247,22 @@ model Guest {
   reviews        Review[]
 
   @@map("guests")
+}
+
+// Audit log of marketing newsletters sent. Lets the host see what
+// went out, to how many people, and what the failure rate was. We
+// don't log per-recipient deliveries — Resend keeps that — only the
+// aggregate counts.
+model NewsletterSend {
+  id              String   @id @default(uuid()) @db.Uuid
+  subject         String
+  bodyMarkdown    String   @map("body_markdown")
+  sentAt          DateTime @default(now()) @map("sent_at")
+  recipientCount  Int      @map("recipient_count")
+  successCount    Int      @map("success_count")
+  failureCount    Int      @map("failure_count")
+
+  @@map("newsletter_sends")
 }
 
 // The central transactional entity. Snapshots price + cancellation

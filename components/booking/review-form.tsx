@@ -15,6 +15,7 @@ interface ReviewFormProps {
 
 export function BookingReviewForm({ checkIn, checkOut, adults, numChildren, instantBookingEnabled }: ReviewFormProps) {
   const [guestMessage, setGuestMessage] = React.useState("");
+  const [marketingOptIn, setMarketingOptIn] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -32,6 +33,7 @@ export function BookingReviewForm({ checkIn, checkOut, adults, numChildren, inst
           adults,
           children: numChildren,
           guestMessage: guestMessage.trim() || undefined,
+          marketingOptIn,
         }),
       });
       const data = await res.json();
@@ -76,6 +78,19 @@ export function BookingReviewForm({ checkIn, checkOut, adults, numChildren, inst
         />
         <p className="text-xs text-neutral-500">{guestMessage.length} / 1000</p>
       </div>
+
+      <label className="flex items-start gap-2 rounded-md border border-neutral-200 bg-neutral-50 p-3 text-sm">
+        <input
+          type="checkbox"
+          checked={marketingOptIn}
+          onChange={(e) => setMarketingOptIn(e.target.checked)}
+          className="mt-0.5"
+        />
+        <span className="text-neutral-700">
+          Keep me updated about availability and special offers. You can
+          unsubscribe with one click from any email.
+        </span>
+      </label>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
