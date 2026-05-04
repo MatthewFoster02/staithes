@@ -227,11 +227,15 @@ export function SiteSettingsForm({ initial }: { initial: SiteSettingsValues }) {
             className={inputClass}
           />
         </Field>
-        <Field label="Analytics ID" help="Leave blank to disable analytics.">
+        <Field
+          label="Plausible domain"
+          help="The domain set up on plausible.io (e.g. staithes.vercel.app). Leave blank to disable analytics. No cookie banner needed."
+        >
           <input
             type="text"
             value={values.analyticsId}
             onChange={(e) => update("analyticsId", e.target.value)}
+            placeholder="staithes.vercel.app"
             className={inputClass}
           />
         </Field>

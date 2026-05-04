@@ -92,9 +92,9 @@ Tracks progress through [Build_Plan.md](Build_Plan.md). Tick tasks as they're co
 
 ## Phase 9: Growth Features
 
-- [ ] **Task 9.1** — Booking analytics
-- [ ] **Task 9.2** — Website analytics integration
-- [ ] **Task 9.3** — Email marketing — guest list & newsletters
+- [x] **Task 9.1** — Booking analytics
+- [x] **Task 9.2** — Website analytics integration
+- [x] **Task 9.3** — Email marketing — guest list & newsletters
 - [ ] **Task 9.4** — Multi-language support (optional)
 
 ---

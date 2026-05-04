@@ -10,6 +10,7 @@ import { calculatePrice } from "@/lib/pricing/calculate";
 import { parseISODate } from "@/lib/availability/dates";
 import { propertyPhotoUrl } from "@/lib/storage/photos";
 import { BookingReviewForm } from "@/components/booking/review-form";
+import { TrackEvent } from "@/components/analytics/plausible";
 import { groupNightlyRates } from "@/lib/pricing/display";
 
 // /book is transactional and every query-string variant would become
@@ -90,6 +91,7 @@ export default async function BookPage({ searchParams }: PageProps) {
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <TrackEvent name="Booking Started" />
       <h1 className="mb-6 text-2xl font-semibold tracking-tight sm:text-3xl">
         Review and confirm
       </h1>

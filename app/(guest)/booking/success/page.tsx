@@ -4,6 +4,7 @@ import { CheckCircle2 } from "lucide-react";
 import { prisma } from "@/lib/db/prisma";
 import { stripe } from "@/lib/stripe/client";
 import { confirmBooking } from "@/lib/booking/confirm";
+import { TrackEvent } from "@/components/analytics/plausible";
 import type Stripe from "stripe";
 
 export const metadata: Metadata = {
@@ -67,6 +68,7 @@ export default async function BookingSuccessPage({ searchParams }: PageProps) {
   }
   return (
     <section className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-6 py-12 text-center">
+      <TrackEvent name="Booking Completed" />
       <CheckCircle2 className="size-12 text-emerald-600" aria-hidden />
       <h1 className="mt-4 text-2xl font-semibold tracking-tight">Thanks for your booking</h1>
       <p className="mt-3 text-sm text-neutral-600">
