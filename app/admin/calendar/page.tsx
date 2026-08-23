@@ -57,7 +57,7 @@ export default async function AdminCalendarPage({ searchParams }: PageProps) {
     prisma.booking.findMany({
       where: {
         propertyId: property.id,
-        status: { in: ["pending", "confirmed"] },
+        status: { in: ["pending", "confirmed", "completed"] },
         checkIn: { lt: fetchTo },
         checkOut: { gt: fetchFrom },
       },
@@ -104,7 +104,7 @@ export default async function AdminCalendarPage({ searchParams }: PageProps) {
     ) {
       const key = formatISODate(day);
       days[key] = {
-        type: booking.status === "confirmed" ? "confirmed" : "pending",
+        type: booking.status === "pending" ? "pending" : "confirmed",
         bookingId: booking.id,
         guestName: `${booking.guest.firstName} ${booking.guest.lastName}`,
       };

@@ -100,12 +100,13 @@ export default async function AdminDashboardPage() {
       },
       _sum: { totalPrice: true },
     }),
-    // For revenue + occupancy: every confirmed booking that touches
-    // any part of the current month.
+    // For revenue + occupancy: every booking that actually happens and
+    // touches any part of the current month. Stays that have already
+    // finished still count — matching the finance and analytics pages.
     prisma.booking.findMany({
       where: {
         propertyId: property.id,
-        status: "confirmed",
+        status: { in: ["confirmed", "completed"] },
         checkIn: { lt: monthEnd },
         checkOut: { gt: monthStart },
       },
